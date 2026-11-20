@@ -3,6 +3,7 @@ import {Group, type Texture} from 'three/webgpu';
 import {FeatureSprites} from '../sprites/FeatureSprites/FeatureSprites.js';
 import {FeatureSpritesGeometry} from '../sprites/FeatureSprites/FeatureSpritesGeometry.js';
 import type {PreparedSpriteFrame} from '../sprites/features/AtlasFrame.js';
+import type {SpriteFeature} from '../sprites/SpriteFeature.js';
 import type {IProjection} from '../stage/IProjection.js';
 import {ParallaxProjection} from '../stage/ParallaxProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from '../stage/ProjectionPlane.js';
@@ -54,7 +55,7 @@ import {
   type StageArtProblem,
 } from './artSources.js';
 import {type ArtTrack, fieldsOfTrack} from './artTrack.js';
-import {type StageArtSpriteApi, stageArtKind} from './stageArtKind.js';
+import {type StageArtExtraApi, type StageArtSpriteApi, stageArtKind} from './stageArtKind.js';
 
 // --- flags of a layer --------------------------------------------------------------------------
 
@@ -149,9 +150,9 @@ const problemLine = ({layer, reason}: StageArtProblem): string =>
  * on a store item in {@link dispose}; a store, an atlas, a texture, a projection and a plane handed
  * in stay the caller's.
  */
-export class StageArt extends Group {
+export class StageArt<Features extends SpriteFeature = never> extends Group {
   /** The mesh the layers are drawn with; the art owns and disposes it. Hand it to a `SpritePicker`. */
-  readonly mesh: FeatureSprites<StageArtSpriteApi>;
+  readonly mesh: FeatureSprites<StageArtSpriteApi & StageArtExtraApi<Features>>;
   /**
    * Resolves once every picture loaded or failed — at once for an atlas handed in —, and when the
    * art is disposed before. It never rejects: {@link problems} says what failed.
@@ -160,6 +161,8 @@ export class StageArt extends Group {
 
   readonly #subject: string;
   readonly #options: StageArtOptions;
+  // the mesh as the art itself uses it, without the features of its caller; `mesh` is the same object
+  readonly #core: FeatureSprites<StageArtSpriteApi>;
   readonly #pxPerUnit: number;
   #projection: IProjection | undefined;
   // the projection that places its camera at a distance from the plane: a ParallaxProjection
@@ -248,14 +251,14 @@ export class StageArt extends Group {
    *   the art's own. What the art cannot load or read out of its source is no refusal but a
    *   problem.
    */
-  constructor(source: StageArtSource | Promise<StageArtSource>, options?: StageArtOptions) {
+  constructor(source: StageArtSource | Promise<StageArtSource>, options?: StageArtOptions<Features>) {
     super();
     this.name = 'twopoint5d.StageArt';
     const {options: opts, shape, subject} = checkStageArt(source, options);
     this.#subject = subject;
     const {plane, material} = opts;
 
-    this.#options = opts;
+    this.#options = opts as StageArtOptions;
     this.#pxPerUnit = opts.pxPerUnit ?? 1;
     this.#planeOption = ProjectionPlane.get(plane ?? 'xy|bottom-left');
     this.#planeGiven = plane !== undefined;
@@ -274,16 +277,17 @@ export class StageArt extends Group {
     if (shape === 'atlas') read = this.#read(source as Extract<StageArtSource, {atlas: unknown}>);
     const names = read?.layers.map((layer) => layer.name) ?? opts.only ?? [];
 
-    this.mesh = new FeatureSprites(stageArtKind(opts.features ?? []), {
+    this.#core = new FeatureSprites(stageArtKind(opts.features ?? []), {
       capacity: Math.min(names.length, MAX_LAYERS),
       ...material,
       transparent: material?.transparent ?? true,
       depthWrite: material?.depthWrite ?? false,
     });
-    this.mesh.name = 'twopoint5d.StageArt.mesh';
+    this.#core.name = 'twopoint5d.StageArt.mesh';
+    this.mesh = this.#core as unknown as typeof this.mesh;
     this.#bindScalars();
-    turnToPlane(this.mesh, turnedTo);
-    this.add(this.mesh);
+    turnToPlane(this.#core, turnedTo);
+    this.add(this.#core);
 
     this.loaded = new Promise<void>((resolve) => {
       this.#resolveLoaded = resolve;
@@ -367,17 +371,17 @@ export class StageArt extends Group {
    * @throws an `Error` for a name the art does not know, listing the names it knows, and once the
    *   art is disposed
    */
-  layer(name: string): ArtLayer {
+  layer(name: string): ArtLayer<StageArtExtraApi<Features>> {
     if (this.#disposed) throw new Error(`${this.#subject}: layer() is not available: this art has been disposed`);
     const index = this.#byName.get(name);
     if (index === undefined) this.#refuseName(name);
-    return this.#layers[index]!;
+    return this.#layers[index]! as ArtLayer<StageArtExtraApi<Features>>;
   }
 
   /** The layer of a sprite of the mesh — the `sprite` a `SpritePicker` answers —; `undefined` for another, and once disposed. */
-  layerOf(sprite: object): ArtLayer | undefined {
+  layerOf(sprite: object): ArtLayer<StageArtExtraApi<Features>> | undefined {
     if (this.#disposed) return undefined;
-    return this.#bySprite.get(sprite);
+    return this.#bySprite.get(sprite) as ArtLayer<StageArtExtraApi<Features>> | undefined;
   }
 
   /**
@@ -459,11 +463,11 @@ export class StageArt extends Group {
       this.#stackDirty = false;
       // two stable passes: the second keeps the order of the first among layers of one depth, so the
       // stack is the same whatever the history of the sort
-      this.mesh.sortBy('artOrder');
-      this.mesh.sortBy('z');
+      this.#core.sortBy('artOrder');
+      this.#core.sortBy('z');
       this.#warnPaintedBelow();
     }
-    this.mesh.update();
+    this.#core.update();
   }
 
   /**
@@ -483,7 +487,7 @@ export class StageArt extends Group {
     super.dispose();
     // the mesh leaves this group and gives up the geometry and material it built; the geometry the art
     // put into its slot is the art's, and goes after it
-    this.mesh.dispose();
+    this.#core.dispose();
     this.#geometry?.dispose();
     this.#geometry = undefined;
     this.#lease?.release();
@@ -513,7 +517,7 @@ export class StageArt extends Group {
   // turns the mesh to `plane`; the layers keep their places in the art frame, so no sprite is written
   #turnTo(plane: ProjectionPlane): void {
     this.#turnedTo = plane.clone();
-    turnToPlane(this.mesh, plane);
+    turnToPlane(this.#core, plane);
     for (let i = 0; i < this.#layers.length; i++) {
       if (this.#flags[i]! & SHOWN) {
         this.#changed = true;
@@ -622,9 +626,9 @@ export class StageArt extends Group {
 
     if (this.#layers.length === 0 && layers.length > 0) {
       // the layers were not known when the mesh was built: a geometry of as many slots takes the place of its empty one
-      if (this.mesh.spritePool!.capacity < layers.length) {
-        const geometry = new FeatureSpritesGeometry(this.mesh.kind, {capacity: layers.length});
-        this.mesh.geometry = geometry;
+      if (this.#core.spritePool!.capacity < layers.length) {
+        const geometry = new FeatureSpritesGeometry(this.#core.kind, {capacity: layers.length});
+        this.#core.geometry = geometry;
         this.#geometry = geometry;
         this.#bindScalars();
       }
@@ -632,7 +636,7 @@ export class StageArt extends Group {
     }
     for (let i = 0; i < layers.length; i++) this.#settleLayer(i, layers[i]!);
 
-    this.mesh.setTexture('colorMap', texture);
+    this.#core.setTexture('colorMap', texture);
     this.#stackDirty = true;
     this.#finish();
   }
@@ -652,7 +656,7 @@ export class StageArt extends Group {
   }
 
   #bindScalars(): void {
-    const pool = this.mesh.spritePool!;
+    const pool = this.#core.spritePool!;
     this.#rotation = scalarAttributeOf(pool, 'rotation');
     this.#fade = scalarAttributeOf(pool, 'fade');
   }
@@ -673,7 +677,7 @@ export class StageArt extends Group {
     this.#sprites = [];
     this.#layers = [];
     for (let i = 0; i < count; i++) {
-      const sprite = this.mesh.createSprite()!;
+      const sprite = this.#core.createSprite()!;
       sprite.visible = 0;
       sprite.artOrder = -ORDER_MIN * MAX_LAYERS + i;
       // a new sprite stands at the rest of a pose: scale 1, opacity 1, shown
@@ -681,7 +685,7 @@ export class StageArt extends Group {
       this.#poses[i * POSE_SIZE + POSE_SCALE_Y] = 1;
       this.#poses[i * POSE_SIZE + POSE_OPACITY] = 1;
       this.#poses[i * POSE_SIZE + POSE_VISIBLE] = 1;
-      const layer = ArtLayerInternals.create(this, i, names[i]!, sprite);
+      const layer = ArtLayerInternals.create(this as StageArt<never>, i, names[i]!, sprite);
       this.#sprites.push(sprite);
       this.#layers.push(layer);
       this.#byName.set(names[i]!, i);
@@ -778,7 +782,7 @@ export class StageArt extends Group {
     }
     if (loaded) this.#write(index, ALL_FIELDS);
     // every attribute of the sprite, the static ones too: the mesh may have been updated before
-    this.mesh.spritePool?.touchVO(sprite);
+    this.#core.spritePool?.touchVO(sprite);
   }
 
   // --- poses ----------------------------------------------------------------------------------
@@ -969,7 +973,7 @@ export class StageArt extends Group {
     // under a camera distance a depth is a k, which scales the size as well as the place
     if (changed & bit(POSE_DEPTH) && !Number.isNaN(this.#distance)) changed |= SCALE;
     const sprite = this.#sprites[index]!;
-    const pool = this.mesh.spritePool!;
+    const pool = this.#core.spritePool!;
     const poses = this.#poses;
     const at = index * POSE_SIZE;
 

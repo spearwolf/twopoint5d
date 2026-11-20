@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs';
 import {Group, ImageLoader, PerspectiveCamera, Plane, Quaternion, Texture, Vector3, type WebGPURenderer} from 'three/webgpu';
-import {afterEach, describe, expect, test, vi} from 'vitest';
+import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
 
 import {BillboardPlacement} from '../sprites/features/BillboardPlacement.js';
 import {AtlasFrame} from '../sprites/features/AtlasFrame.js';
@@ -18,7 +18,6 @@ import type {ArtLayerDef} from './artSources.js';
 import {artTrack} from './artTrack.js';
 import type {StageArtSource} from './artOptions.js';
 import {StageArt} from './StageArt.js';
-import type {StageArtSpriteApi} from './stageArtKind.js';
 
 // A canvas of 100 × 100, three layers bottom first: `back` at a depth of 50, the canvas whole; `box`,
 // two frames — closed, trimmed to 20, 30, 40 × 20, and open, 20, 20, 40 × 30 —; `lamp`, 60, 10, 10 × 10
@@ -420,7 +419,7 @@ describe('poses', () => {
 describe('features', () => {
   test('a feature folds into the kind, and its values are written through layer.sprite', () => {
     const art = new StageArt(sceneSource(), {features: [Flash, Tint]});
-    const sprite = art.layer('box').sprite as unknown as StageArtSpriteApi & FlashApi;
+    const sprite = art.layer('box').sprite;
 
     sprite.setFlash(1, 0.5, 0.25, 0.6);
     expect(sprite.flashAmount).toBeCloseTo(0.6);
@@ -429,10 +428,22 @@ describe('features', () => {
     expect(art.layer('box').sprite.width).toBeGreaterThan(0);
   });
 
+  test('the features a caller hands in type the sprites of its layers, the mesh and layerOf()', () => {
+    const art = new StageArt(sceneSource(), {features: [Flash, Tint]});
+    expectTypeOf(art.layer('box').sprite.setFlash).toBeFunction();
+    expectTypeOf(art.layer('box').sprite.width).toBeNumber();
+    expectTypeOf(art.layerOf(art.layer('box').sprite)!.sprite).toExtend<FlashApi>();
+    expectTypeOf(art.mesh.createSprite()!).toExtend<FlashApi>();
+
+    const plain = new StageArt(sceneSource());
+    // @ts-expect-error an art without the feature has no setFlash on its sprites
+    expect(typeof plain.layer('box').sprite.setFlash).toBe('undefined');
+  });
+
   test('a write through layer.sprite is outside the change detection', () => {
     const art = new StageArt(sceneSource(), {features: [Flash]});
     art.takeChanged();
-    (art.layer('lamp').sprite as unknown as FlashApi).setFlash(1, 1, 1, 0.6);
+    art.layer('lamp').sprite.setFlash(1, 1, 1, 0.6);
     expect(art.takeChanged()).toBe(false);
   });
 

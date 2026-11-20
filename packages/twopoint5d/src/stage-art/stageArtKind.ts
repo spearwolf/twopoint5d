@@ -1,4 +1,4 @@
-import {defineSprite, type SpriteKind} from '../sprites/defineSprite.js';
+import {defineSprite, type SpriteApiOf, type SpriteKind} from '../sprites/defineSprite.js';
 import {Anchor, type AnchorApi} from '../sprites/features/Anchor.js';
 import {AtlasFrame, type AtlasFrameApi} from '../sprites/features/AtlasFrame.js';
 import {Fade, type FadeApi} from '../sprites/features/Fade.js';
@@ -28,6 +28,14 @@ export type StageArtSpriteApi = InstancePositionApi &
      */
     artOrder: number;
   };
+
+/**
+ * The api the features `Features` of an art add to the sprite handle of its layers: the
+ * intersection of their apis, as `defineSprite()` derives it; `object` for an art without any.
+ */
+export type StageArtExtraApi<Features extends SpriteFeature> = [Features] extends [never]
+  ? object
+  : SpriteApiOf<readonly Features[]>;
 
 /** The order key of an art layer: an attribute without a stage, which `sortBy('artOrder')` reads. */
 export const ArtOrder = defineFeature<{artOrder: number}>({name: 'artOrder', attributes: {artOrder: {size: 1}}});

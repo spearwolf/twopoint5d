@@ -25,7 +25,7 @@ export type StageArtSource =
   | {readonly atlas: TextureAtlas<unknown>; readonly texture: Texture; readonly layers?: readonly ArtLayerDef[]};
 
 /** The options of a `StageArt`. Every field is optional. */
-export interface StageArtOptions {
+export interface StageArtOptions<Features extends SpriteFeature = SpriteFeature> {
   /** The name the messages of the art give it: `StageArt "kitchen": …`. */
   name?: string;
   /** Artwork pixels per unit of the stage. Default 1. */
@@ -55,7 +55,7 @@ export interface StageArtOptions {
    * yourself. A feature that takes a slot the art fills — a second frame source, another placement —
    * is refused, and the message names it.
    */
-  features?: readonly SpriteFeature[];
+  features?: readonly Features[];
   /**
    * The parameters of the material of the mesh — `transparent` (default `true`), `depthWrite`
    * (default `false`), `depthTest`, `alphaTest`, … The textures, the placement and the mesh around

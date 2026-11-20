@@ -27,11 +27,11 @@ export interface ArtLayerInfo {
  * @internal
  */
 export const ArtLayerInternals: {
-  create(art: StageArt, index: number, name: string, sprite: StageArtSpriteApi & VO): ArtLayer;
+  create(art: StageArt<never>, index: number, name: string, sprite: StageArtSpriteApi & VO): ArtLayer<object>;
   adopt(layer: ArtLayer, info: ArtLayerInfo): void;
-  set(art: StageArt, index: number, pose: ArtPose): void;
-  apply(art: StageArt, index: number, track: ArtTrack, seconds: number): void;
-  reset(art: StageArt, index: number): void;
+  set(art: StageArt<never>, index: number, pose: ArtPose): void;
+  apply(art: StageArt<never>, index: number, track: ArtTrack, seconds: number): void;
+  reset(art: StageArt<never>, index: number): void;
 } = {
   create: unfilledInternal('ArtLayerInternals.create()'),
   adopt: unfilledInternal('ArtLayerInternals.adopt()'),
@@ -42,7 +42,7 @@ export const ArtLayerInternals: {
 
 // what ArtLayerInternals.create() hands the constructor, which takes no arguments: the declaration of
 // the class names no type that is internal to the library
-let pending: {art: StageArt; index: number; name: string; sprite: StageArtSpriteApi & VO} | undefined;
+let pending: {art: StageArt<never>; index: number; name: string; sprite: StageArtSpriteApi & VO} | undefined;
 
 /**
  * The handle of one layer of a {@link StageArt}, the one a hot path keeps: `art.layer(name)` answers
@@ -53,7 +53,7 @@ let pending: {art: StageArt; index: number; name: string; sprite: StageArtSprite
  * `apply()` and `reset()` write nothing — `set()` and `apply()` still refuse what they cannot use —;
  * the rest answers what it held.
  */
-export class ArtLayer {
+export class ArtLayer<Extra extends object = object> {
   /** The name of the layer, as the source or `only` names it. */
   readonly name: string;
   /**
@@ -61,9 +61,9 @@ export class ArtLayer {
    * to a feature handed in through the options. A write through it is the caller's: it goes past the
    * change detection of the art and its next pose overwrites what it shares with one.
    */
-  readonly sprite: StageArtSpriteApi & VO;
+  readonly sprite: StageArtSpriteApi & Extra & VO;
 
-  readonly #art: StageArt;
+  readonly #art: StageArt<never>;
   readonly #index: number;
   readonly #subject: string;
   #info: ArtLayerInfo | undefined;
@@ -88,7 +88,7 @@ export class ArtLayer {
     this.#art = init.art;
     this.#index = init.index;
     this.name = init.name;
-    this.sprite = init.sprite;
+    this.sprite = init.sprite as StageArtSpriteApi & Extra & VO;
     this.#subject = `ArtLayer ${describeValue(init.name)}`;
   }
 

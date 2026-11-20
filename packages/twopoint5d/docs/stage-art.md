@@ -527,18 +527,17 @@ layer that is hidden or faded out to `opacity: 0` is never hit. Of layers at dif
 nearest wins, as on the screen.
 
 A feature the art does not bring itself goes in through `features`: `Flash` lights the layer under
-the pointer. Its values are written through `layer.sprite`; the library cannot know the features of
-an art in the type of its layers, so you say them with a cast, `StageArtSpriteApi` plus the `FlashApi`
-of the feature.
+the pointer. Its values are written through `layer.sprite`, whose type carries the api of the
+features you handed in: `layer.sprite.setFlash(1, 1, 1, 0.6)` needs no cast.
 
 ```ts check
 import {
+  type ArtLayer,
   Flash,
   type FlashApi,
   type FramePacer,
   SpritePicker,
   StageArt,
-  type StageArtSpriteApi,
   type TextureStore,
 } from '@spearwolf/twopoint5d';
 import type {Camera, WebGPURenderer} from 'three/webgpu';
@@ -551,13 +550,13 @@ declare const frames: FramePacer;
 const art = new StageArt({store, id: 'kitchen'}, {features: [Flash]});
 const picker = new SpritePicker(renderer);
 
-let glowing: (StageArtSpriteApi & FlashApi) | undefined;
+let glowing: ArtLayer<FlashApi>['sprite'] | undefined;
 
 // the pointer in normalized device coordinates of the view of the camera: x and y from -1 to 1, y up
 async function hover(pointer: {x: number; y: number}): Promise<string | undefined> {
   const hit = await picker.pick(camera, pointer, [art.mesh]);
   const layer = hit && art.layerOf(hit.sprite); // the layer, or undefined: nothing under the pointer
-  const sprite = layer && (layer.sprite as unknown as StageArtSpriteApi & FlashApi);
+  const sprite = layer?.sprite; // typed by the features of the art: setFlash() is there
   if (sprite !== glowing) {
     glowing?.setFlash(1, 1, 1, 0);
     sprite?.setFlash(1, 1, 1, 0.6);
@@ -715,7 +714,7 @@ is no sprite of the art, and once the art is disposed.
 
 `features` is a list of sprite features — `Flash`, `Tint`, `PaletteSwap`, a feature of your own — that
 join the kind of the art after the features it brings itself. Their values are written through
-`layer.sprite`, which you type by the features you hand in. Such a write goes past the change
+`layer.sprite`, which `StageArt` types by the features you hand in: `new StageArt(source, {features: [Flash]})` is a `StageArt<typeof Flash>`, its layers an `ArtLayer<FlashApi>`. Such a write goes past the change
 detection of the art: `takeChanged()` does not see it, and the next pose of a layer overwrites what
 it shares with it. A feature that takes a slot the art already fills — a second frame source such as
 `AtlasFrame`, another placement — is refused by `new StageArt()` with the message of `defineSprite()`,

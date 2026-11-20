@@ -6,4 +6,4 @@ export type {ArtLayerDef, ArtLayerOptions, StageArtProblem} from './artSources.j
 export {type ArtKey, type ArtTrack, type ArtTrackOptions, artTrack, rampAt} from './artTrack.js';
 export type {StageArtOptions, StageArtSource} from './artOptions.js';
 export {StageArt} from './StageArt.js';
-export type {StageArtSpriteApi} from './stageArtKind.js';
+export type {StageArtExtraApi, StageArtSpriteApi} from './stageArtKind.js';
