@@ -21,12 +21,12 @@ build or check of the repo runs the generators, so a change to an asset is a com
 generator and its output together. The output is the same, byte for byte, on every run with the
 same versions of Node, sharp, Blender and Aseprite — save where Cycles renders or bakes on a GPU, which
 schedules its samples a little differently each time: `matte-3d` of `stage-masks`, the two
-`camera-rig-*` scenes, `stage-art-machine` and `stage-art-depth` come out the same picture, not the
-same bytes, and their sections say by how much.
+`camera-rig-*` scenes, `stage-art-machine`, `stage-art-depth` and `stage-art-layer-files` come out the same picture, not
+the same bytes, and their sections say by how much.
 
 Requirements: Node (the repo's), `sharp` (a devDependency of the lookbook) to decode the
 committed raw images and to resize, and for `boomer-shooter-corridor`, `stage-masks` (its
-`matte-3d`), `camera-rig-two-rooms`, `camera-rig-into-the-map`, `stage-art-machine` and `stage-art-depth` Blender on the PATH (tested with 5.2 LTS and 5.3, falls
+`matte-3d`), `camera-rig-two-rooms`, `camera-rig-into-the-map`, `stage-art-machine`, `stage-art-depth` and `stage-art-layer-files` Blender on the PATH (tested with 5.2 LTS and 5.3, falls
 back to `/usr/bin/blender`), run headless with `-b --factory-startup`; for `stage-art-aseprite` and
 `stage-art-depth` Aseprite — the binary `ASEPRITE` names, else `aseprite` on the PATH (tested with 1.3.17.2), run
 headless with `-b`. No
@@ -1002,3 +1002,64 @@ taken by the layers in it.
 
 The pivot of the slice is a corner between pixels: the bottom left corner of the pixel the slice's
 pivot marks.
+
+## stage-art-layer-files
+
+"The specimen shelf", the art of the demo `stage-art-layer-files`, from
+`stage-art-layer-files/generate.mjs` and `blender_shelf.py`: a shelf of specimen jars in the cabinet
+of a research vessel — red coral, an octopus, a sea urchin, a nautilus and a starfish in yellowed
+spirit, a brass fiddle rail in front of them, a drawer under the shelf with a paper tag hanging from
+a hook, a chart pinned to the teak bulkhead behind —, **rendered in Blender layer by layer as
+full-canvas PNGs**, the export a paint tool's "Export Layers" writes (§4.2 of the proposal
+*stage-art-layers*). There is no atlas: the art trims each file to its pixels and packs the files
+itself as it loads them.
+
+Blender builds the cabinet from primitives, lathed jars, metaballs, curves and procedural materials
+and renders it through one orthographic camera — from the front and 6° from above, 1280 × 800
+pixels, one pixel 0.8 mm on the plane of the camera — with Cycles, 256 samples a layer (384 for the
+jars), AgX (Medium High Contrast), denoised by OpenImageDenoise. Each layer is rendered alone on a
+transparent film, the others invisible to the camera but there for the light, the shadows and the
+reflections: a jar refracts the bulkhead and the shelf behind it and is opaque where its glass is, so
+it lies on them as painted, and the film around it stays clear. The glass and the spirit cast no
+shadows — Cycles traces no caustics here, and the specimens would stand in the dark. The light of the
+porthole is rendered on black onto a plain matte screen where the bulkhead stands, light alone, so
+that the layer can slide across the grain and the chart as the ship rolls.
+
+The generator cuts every alpha below 6 with a soft knee — every alpha lowered by 6 and stretched back
+to 255 — and every pixel of a jar outside a generous box round it that Blender writes, so that no
+speck of render noise stretches the box the art finds; turns the light of the porthole into a layer
+(the brightest channel times 0.6 the alpha, the colour lifted by it, faded out between 120 and 205
+pixels from its middle); writes a pivot marker for each jar and for the tag; and paints the dust in
+the light, seeded, the same on every run. Cycles renders on a GPU when it finds one and on the CPU
+otherwise (`--cpu` in the arguments of `blender_shelf.py` forces it), with a fixed seed. Two GPU runs gave the same pictures but for 280 of 98 million channel values,
+none off by more than 2 of 255, and the same boxes; the boxes are found pixel by pixel, so a file
+whose box moves after a render of an unchanged scene is worth a look before it is committed. The
+renders land in `stage-art-layer-files/.render-cache/` (ignored by git) with a `layout.json` of the
+canvas, the depth of the bulkhead, the pivots, the boxes the generator cuts the jars to and the
+middle of the light, and `--skip-render` reuses them: from the same cache every file comes out the
+same byte for byte. `--only=composite` in the arguments of `blender_shelf.py` renders the whole scene
+in one picture, `composite.png`, for a look at the composition; the build does not use it.
+
+Every file is a PNG of 1280 × 800, straight alpha, the colour of a clear pixel 0. The demo hands them
+to `new StageArt({files, baseUrl})` as a list in the order of this table, bottom first; the canvas
+round the shelf is `#0d0705`.
+
+| file | layer | what |
+| --- | --- | --- |
+| `wall@240.png` | `wall`, depth 240 | opaque, the whole canvas: the bulkhead behind the shelf, teak planks laid across with brass screws, a chart pinned to it ("R.V. PETREL", a sounding profile of station 147), lit warm from the right and cool from the porthole on the left |
+| `sunlight.png` | `sunlight` | the light of the porthole on the bulkhead, light alone: a soft warm disc round (424, 167), see-through |
+| `motes.png`, `motes-1.png` … `motes-7.png` | `motes`, 8 frames | dust in the light of the porthole, specks that drift on small circles and glint, a loop: frame 8 would be frame 0. Further frames of a layer by the `-<suffix>` of their names rather than a numbered `motes#n` strip: a `#` is sent as `%23`, and the lookbook's dev server finds no file under a name with a percent escape in it |
+| `shelf.png` | `shelf` | the shelf board with its rounded front edge and the drawer under it — two brass cup handles, a card holder "No. 147 - 152" —, the shadows of the jars and the rail on the board |
+| `coral.png`, `coral.pivot.png` | `coral` | a slender corked jar, a branch of red coral on a stone in pale spirit; pivot (230, 638) |
+| `octopus.png`, `octopus.pivot.png` | `octopus` | a wide jar of green glass under a lid sealed with red wax and string, an octopus in yellowed spirit, its arms tangled at the bottom; pivot (455, 646) |
+| `urchin.png`, `urchin.pivot.png` | `urchin` | a squat jar under a brass screw cap, a violet sea urchin on its spines; pivot (680, 649) |
+| `nautilus.png`, `nautilus.pivot.png` | `nautilus` | a jar with a ground-glass stopper, a nautilus shell with brown flames hanging from a thread; pivot (895, 644) |
+| `starfish.png`, `starfish.pivot.png` | `starfish` | a jar of green glass under a black bakelite cap, an orange starfish; pivot (1085, 648) |
+| `rail.png` | `rail` | the brass fiddle rail across the front of the shelf on six turned posts, in front of the jars |
+| `tag.png`, `tag.pivot.png` | `tag` | a paper tag on a string from a brass hook under the front edge of the shelf, "Sta. 147 · 2,600 fm · 14 March"; pivot (860, 705), the knot on the hook. It ends 12 pixels or more above the bottom of the canvas, so that it swings clear of the edge |
+
+Each jar carries a paper label bent round its glass, its name in Latin and its station. A pivot
+marker is a full canvas, clear but for a dot of 2 × 2 white pixels: the middle of the dot, a corner
+between pixels, is the pivot of its layer — for a jar the middle of the front of its foot on the
+shelf, the point it rocks about. `wall`, `sunlight`, `motes`, `shelf` and `rail` have no marker and
+turn about the middle of their boxes.

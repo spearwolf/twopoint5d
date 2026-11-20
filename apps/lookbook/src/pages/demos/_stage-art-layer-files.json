@@ -1,0 +1,17 @@
+{
+  "title": "stage art: layer files",
+  "shortDescription": "A shelf of specimen jars aboard a research vessel, exported as one full-canvas PNG per layer: the art reads depth, pivots and frames out of the file names, trims and packs the files itself, and the jars rock with the roll of the ship",
+  "description": "A shelf of specimen jars in the cabinet of a research vessel — red coral, an octopus, a sea urchin, a nautilus and a starfish in yellowed spirit, behind a brass fiddle rail —, rendered in Blender **one layer at a time on the full canvas**, the way Photoshop's \"Export Layers to Files\" or Krita's \"Export Layers\" writes them: 24 PNGs of 1280 × 800, transparent around their pictures. `new StageArt({files, baseUrl})` takes the list, bottom first — the one thing a folder of PNGs does not keep — and reads the rest out of the names ([A scene out of layer PNGs](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stage-art.md#a-scene-out-of-layer-pngs)): `wall@240.png` puts the bulkhead 240 artwork pixels behind the plane, `coral.pivot.png` is a layer with one dot on it whose middle is the point the coral jar rocks about, `motes.png` and `motes-1.png` … `motes-7.png` are the eight frames of the dust in the light of the porthole. The art fetches every file at once, trims each to the box of its pixels and packs the boxes into an atlas of its own. The panel shows the layers it named at once from the list, and the boxes, pivots and depths it found once the files were there.\n\n**The ship rolls**: an `artTrack()` per jar rocks it about the dot of its marker, the tag on its string swings wide against the roll, the light of the porthole slides across the bulkhead, and the dust in it steps through its frames by `animationFrameAt()`.\n\n**Slow load** holds each file back for a moment in the demo's own loader — the art fetches with the global `fetch()`, and the page puts one there that holds the responses of these files back, a little longer for each, and lets the chips of the panel follow every request. The files trickle in; the canvas stays empty, with nothing flashing up; and the shelf appears whole, every layer together, once the last file has settled. **Break a file** swaps `nautilus.png` for `missing/nautilus.png`: the art still knows the layer from the name, the jar stays away, `art.problems` lists it with its url, and the shelf goes on rolling.",
+  "url": "/demos/stage-art-layer-files",
+  "tags": [
+    "StageArt",
+    "artTrack",
+    "animationFrameAt",
+    "OrthographicProjection",
+    "Stage2D",
+    "StageRenderer",
+    "Display",
+    "vanilla",
+    "demo"
+  ]
+}

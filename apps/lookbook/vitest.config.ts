@@ -27,6 +27,7 @@ export default defineConfig({
         'src/demos/utils/disposeMaterial.ts',
         'src/demos/utils/fetchAsset.ts',
         'src/demos/utils/seededRandom.ts',
+        'src/demos/stage-art-layer-files/heldBackFetch.ts',
         'src/demos/stage-masks/CrawlRig.ts',
         'src/demos/stage-masks/helpers.ts',
         'src/demos/stage-masks/SeanceClock.ts',

@@ -1,0 +1,471 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-art-layer-files.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <details class="readout fixed" data-readout>
+      <summary>the files, bottom first — and what the art made of them</summary>
+      <ol class="files" data-files></ol>
+      <p data-status>loading …</p>
+      <table>
+        <thead>
+          <tr>
+            <th title="the place in the stack, bottom first">#</th>
+            <th title="known at once, out of the list of files">layer</th>
+            <th title="where its picture lies on the canvas: x, y, w × h — the box of its pixels">box</th>
+            <th title="the point it turns about: the middle of the dot of its .pivot file, else the middle of its box">pivot</th>
+            <th title="from the @ in its file name">depth</th>
+            <th title="its files: one, or more of the name with a -suffix">frames</th>
+          </tr>
+        </thead>
+        <tbody data-layers></tbody>
+      </table>
+      <ul class="problems" data-problems></ul>
+    </details>
+    <div class="hud fixed bottom-4 left-4">
+      <p class="help">
+        <b>slow load</b>: the files trickle in, and the shelf appears whole once the last has settled ·
+        <b>break a file</b>: one jar stays away, the shelf sways on
+      </p>
+    </div>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #0d0705;
+    color: #e2d2bf;
+  }
+  .readout,
+  .hud p {
+    font-family: monospace;
+    font-size: 10.5px;
+    background: rgba(13 7 5 / 82%);
+    border: 1px solid rgba(214 164 92 / 38%);
+    border-radius: 4px;
+  }
+  .readout {
+    top: calc(var(--demo-nav-bar-height) + 0.75rem);
+    left: 1rem;
+    max-width: min(34rem, calc(100vw - 2rem));
+    max-height: calc(100vh - var(--demo-nav-bar-height) - 6rem);
+    overflow: auto;
+    padding: 0.35em 0.7em;
+  }
+  .readout summary {
+    cursor: pointer;
+    color: #e8b45e;
+  }
+  .readout p {
+    margin: 0.5em 0;
+  }
+  .files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin: 0.6em 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  /* the chips are built at runtime, out of reach of the scoped styles */
+  .files :global(li) {
+    padding: 0 0.45em;
+    border-radius: 3px;
+    border: 1px solid rgba(226 210 191 / 18%);
+    color: #8d7d6b;
+    transition:
+      background-color 0.2s,
+      color 0.2s;
+  }
+  .files :global(li[data-state='requested']) {
+    color: #b9a891;
+  }
+  .files :global(li[data-state='held']) {
+    color: #ffd796;
+    background: rgba(232 180 94 / 22%);
+  }
+  .files :global(li[data-state='arrived']) {
+    color: #d9f2cf;
+    background: rgba(118 178 96 / 26%);
+  }
+  .files :global(li[data-state='failed']) {
+    color: #ffd2c8;
+    background: rgba(214 72 52 / 45%);
+  }
+  .readout table {
+    border-collapse: collapse;
+    white-space: nowrap;
+  }
+  .readout th {
+    text-align: left;
+    color: #e8b45e;
+    font-weight: normal;
+    padding: 0 0.6em 0.2em 0;
+  }
+  .readout :global(td) {
+    padding: 0 0.6em 0 0;
+    color: #b6a690;
+  }
+  .readout :global(td:nth-child(2)) {
+    color: #f4e8da;
+  }
+  .readout :global(tr.missing td) {
+    color: #ff9f8c;
+  }
+  .problems {
+    margin: 0.5em 0 0.2em;
+    padding-left: 1.2em;
+    color: #ffb4a3;
+    white-space: normal;
+  }
+  .hud {
+    pointer-events: none;
+  }
+  .hud p {
+    width: fit-content;
+    max-width: calc(100vw - 2rem);
+    padding: 0.35em 0.7em;
+    font-size: 95%;
+  }
+  .hud b {
+    color: #e8b45e;
+    font-weight: normal;
+  }
+</style>
+
+<script>
+  import {
+    type AnimationTiming,
+    animationFrameAt,
+    type ArtLayer,
+    type ArtTrack,
+    artTrack,
+    Display,
+    OrthographicProjection,
+    Stage2D,
+    StageArt,
+    StageRenderer,
+  } from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import {type HeldRequest, heldBackFetch} from '~demos/stage-art-layer-files/heldBackFetch';
+  import assetsUrl from '~demos/utils/assetsUrl';
+  import {DemoParts} from '~demos/utils/demoParts';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // the canvas of the export, in artwork pixels (apps/lookbook/assets-src/README.md, stage-art-layer-files)
+  const CANVAS = {width: 1280, height: 800};
+  const CABIN = '#0d0705';
+  const BASE_URL = assetsUrl('stage-art-layer-files/');
+
+  // the export of the paint file, bottom first: the order is the one thing a folder of PNGs does not
+  // keep, so the code says it. The names say the rest — a depth after @, a pivot marker per jar and
+  // for the tag, the eight frames of the dust as `motes` and its `-1` … `-7`
+  const FILES = [
+    'wall@240.png',
+    'sunlight.png',
+    'motes.png',
+    'motes-1.png',
+    'motes-2.png',
+    'motes-3.png',
+    'motes-4.png',
+    'motes-5.png',
+    'motes-6.png',
+    'motes-7.png',
+    'shelf.png',
+    'coral.png',
+    'coral.pivot.png',
+    'octopus.png',
+    'octopus.pivot.png',
+    'urchin.png',
+    'urchin.pivot.png',
+    'nautilus.png',
+    'nautilus.pivot.png',
+    'starfish.png',
+    'starfish.pivot.png',
+    'rail.png',
+    'tag.png',
+    'tag.pivot.png',
+  ];
+  // the file "break a file" swaps for one that is not there: the layer keeps its name — the name of a
+  // file is the part after its last slash —, so the art knows the jar, and misses its picture
+  const BROKEN = {file: 'nautilus.png', missing: 'missing/nautilus.png'};
+
+  // the ship rolls once in ROLL seconds; every move of the shelf is a track over that time
+  const ROLL = 8;
+  // how far each jar rocks about the middle of its foot, in degrees, and how late it follows the
+  // roll, in seconds: the tall ones rock most
+  const JARS: Record<string, {deg: number; lag: number}> = {
+    coral: {deg: 1.5, lag: 0.35},
+    octopus: {deg: 1.0, lag: 0.2},
+    urchin: {deg: 0.5, lag: 0.05},
+    nautilus: {deg: 0.9, lag: 0.15},
+    starfish: {deg: 0.8, lag: 0.1},
+  };
+  // the tag hangs free: it swings wide and late against the roll
+  const TAG = {deg: 7, lag: 0.9};
+  // the light of the porthole slides across the bulkhead as the ship rolls, and the dust in it with it
+  const LIGHT = {x: 38, y: 9, lag: -0.4};
+  // the dust: eight frames, a file each, a frame every 160 ms, round and round
+  const MOTES: AnimationTiming = {frameCount: 8, duration: 1.28, durations: undefined, playback: 'loop'};
+  // the slow load: each file is held back a little longer than the one before it, so they arrive one by one
+  const HOLD = {first: 260, step: 115};
+
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1';
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+  const parts = new DemoParts(display);
+
+  // painted art: the shelf fills the window as far as it can, never at more than twice its size
+  const stage = parts.keep(
+    new Stage2D(new OrthographicProjection('xy|bottom-left', {fit: 'contain', ...CANVAS, maxPixelZoom: 2})),
+  );
+  const sr = parts.keep(new StageRenderer().setClearColor(new Color(CABIN), 1).add(stage));
+
+  const settings = {slow: false, broken: false};
+
+  // --- the demo's own loader: the art fetches by url, and this fetch holds the shelf's files back ---
+
+  // the art fetches each file under its baseUrl with the global fetch(); the page puts a fetch there
+  // that holds the responses of these files back while "slow load" is on — and tells every step to
+  // the chips of the panel — and puts the browser's own back when it goes
+  const base = new URL(BASE_URL, document.baseURI).href;
+  const urlOf = (file: string): string => new URL(file.replaceAll('#', '%23'), base).href;
+  const browserFetch = window.fetch;
+  const pageFetch = heldBackFetch(browserFetch.bind(window), {base, begin: (url) => current.begin(url)});
+  window.fetch = pageFetch;
+  parts.onDispose(() => {
+    if (window.fetch === pageFetch) window.fetch = browserFetch;
+  });
+
+  const filesOut = document.querySelector('[data-files]')!;
+  const statusOut = document.querySelector('[data-status]')!;
+  const layersOut = document.querySelector('[data-layers]')!;
+  const problemsOut = document.querySelector('[data-problems]')!;
+  // the panel covers the left of the shelf in a narrow window: open only where there is room
+  if (window.innerWidth >= 1400 && !isPreview) document.querySelector('[data-readout]')!.setAttribute('open', '');
+
+  /** One load of the shelf: its list of files, their chips, and how long each is held. */
+  interface Load {
+    begin(url: string): HeldRequest;
+  }
+
+  function makeLoad(files: readonly string[], slow: boolean): Load {
+    filesOut.replaceChildren();
+    const chips = new Map<string, HTMLLIElement>();
+    const holds = new Map<string, number>();
+    files.forEach((file, index) => {
+      const chip = document.createElement('li');
+      chip.textContent = file;
+      chip.dataset['state'] = 'waiting';
+      filesOut.append(chip);
+      chips.set(urlOf(file), chip);
+      holds.set(urlOf(file), slow ? HOLD.first + index * HOLD.step : 0);
+    });
+    let settled = 0;
+    const load: Load = {
+      begin(url) {
+        const chip = chips.get(url);
+        return {
+          holdMs: holds.get(url) ?? 0,
+          tell(state, detail) {
+            if (chip === undefined) return;
+            chip.dataset['state'] = state;
+            chip.title = detail === undefined ? state : `${state}: ${detail}`;
+            if (state === 'arrived' || state === 'failed') {
+              settled += 1;
+              // a request of a load given up on, aborted after the next one began, leaves the status alone
+              if (load === current) {
+                statusOut.textContent = `${settled} of ${files.length} files settled — the art draws nothing until the last one has`;
+              }
+            }
+          },
+        };
+      },
+    };
+    return load;
+  }
+
+  // --- the art, built anew for each load --------------------------------------------------------
+
+  function filesNow(): string[] {
+    return settings.broken ? FILES.map((file) => (file === BROKEN.file ? BROKEN.missing : file)) : [...FILES];
+  }
+
+  type Posed = {
+    jars: {layer: ArtLayer; track: ArtTrack; lag: number}[];
+    tag?: {layer: ArtLayer; track: ArtTrack};
+    light: {layer: ArtLayer; track: ArtTrack}[];
+    motes?: ArtLayer;
+  };
+
+  // the tracks of the shelf, made once the art has loaded: the light and the dust slide from where
+  // their pictures lie, which only the load tells
+  function adopt(next: StageArt): Posed {
+    const posed: Posed = {jars: [], light: []};
+    for (const [name, {deg, lag}] of Object.entries(JARS)) {
+      const track = artTrack(
+        [
+          {at: 0, deg: -deg},
+          {at: ROLL / 2, deg, ease: 'ease-in-out'},
+        ],
+        {playback: 'pingpong'},
+      );
+      // a jar whose file failed is hidden; its pose is kept all the same
+      posed.jars.push({layer: next.layer(name), track, lag});
+    }
+    posed.tag = {
+      layer: next.layer('tag'),
+      track: artTrack(
+        [
+          {at: 0, deg: TAG.deg},
+          {at: ROLL / 2, deg: -TAG.deg, ease: 'ease-in-out'},
+        ],
+        {playback: 'pingpong'},
+      ),
+    };
+    for (const name of ['sunlight', 'motes']) {
+      const layer = next.layer(name);
+      const rest = layer.rest;
+      if (rest === undefined) continue;
+      const track = artTrack(
+        [
+          {at: 0, x: rest.x - LIGHT.x, y: rest.y + LIGHT.y},
+          {at: ROLL / 2, x: rest.x + LIGHT.x, y: rest.y - LIGHT.y, ease: 'ease-in-out'},
+        ],
+        {playback: 'pingpong'},
+      );
+      posed.light.push({layer, track});
+    }
+    posed.motes = next.layer('motes');
+    return posed;
+  }
+
+  const motesPose = {frame: 0};
+
+  function pose(posed: Posed, now: number): void {
+    for (const {layer, track, lag} of posed.jars) layer.apply(track, now - lag);
+    if (posed.tag) posed.tag.layer.apply(posed.tag.track, now - TAG.lag);
+    for (const {layer, track} of posed.light) layer.apply(track, now - LIGHT.lag);
+    if (posed.motes?.loaded) {
+      motesPose.frame = animationFrameAt(MOTES, now);
+      posed.motes.set(motesPose);
+    }
+  }
+
+  const fmt = (n: number): string => String(Math.round(n));
+
+  function readOut(next: StageArt, seconds: number | undefined): void {
+    layersOut.replaceChildren();
+    next.names.forEach((name, index) => {
+      const layer = next.layer(name);
+      const row = document.createElement('tr');
+      const box = layer.box;
+      const pivot = layer.pivot;
+      const cells = [
+        String(index),
+        name,
+        // a layer whose picture did not load has an empty box at its pivot
+        box && box.w > 0 ? `${fmt(box.x)}, ${fmt(box.y)}, ${fmt(box.w)} × ${fmt(box.h)}` : '—',
+        pivot ? `${fmt(pivot[0])}, ${fmt(pivot[1])}` : '—',
+        layer.rest && layer.rest.depth !== 0 ? String(layer.rest.depth) : '',
+        layer.frameCount > 1 ? String(layer.frameCount) : '',
+      ];
+      for (const text of cells) {
+        const cell = document.createElement('td');
+        cell.textContent = text;
+        row.append(cell);
+      }
+      if (seconds !== undefined && !layer.loaded) row.classList.add('missing');
+      layersOut.append(row);
+    });
+    problemsOut.replaceChildren();
+    for (const problem of next.problems) {
+      const item = document.createElement('li');
+      item.textContent = `${problem.layer ?? 'the source'}: ${problem.reason}${problem.url ? ` (${problem.url})` : ''}`;
+      problemsOut.append(item);
+    }
+    if (seconds === undefined) {
+      statusOut.textContent = `${next.names.length} layers named by the list — waiting for the files`;
+    } else {
+      const shown = next.names.filter((name) => next.layer(name).loaded).length;
+      const problems = next.problems.length;
+      statusOut.textContent = `every file settled after ${seconds.toFixed(2)} s: ${shown} of ${next.names.length} layers shown, together${problems ? ` — ${problems} problem${problems === 1 ? '' : 's'}` : ''}`;
+    }
+  }
+
+  let current: Load = makeLoad(FILES, false);
+  let posed: Posed | undefined;
+
+  function makeArt(files: readonly string[]): StageArt {
+    // the renderer sizes the art's atlas up to the largest texture its device allows
+    return new StageArt(
+      {files, baseUrl: BASE_URL},
+      {name: 'specimen shelf', projection: stage.projection, renderer: display.renderer},
+    );
+  }
+
+  let art = makeArt(FILES);
+  stage.scene.add(art);
+  parts.onDispose(() => art.dispose());
+
+  function settle(next: StageArt, startedAt: number): void {
+    void next.loaded.then(() => {
+      // the art says its problems on the console itself, once, after the load
+      if (display.isDisposed || next !== art) return;
+      posed = adopt(next);
+      readOut(next, (performance.now() - startedAt) / 1000);
+      preview.ready(display);
+    });
+  }
+
+  readOut(art, undefined);
+  settle(art, performance.now());
+
+  // a toggle loads the shelf anew: the old art goes — its requests aborted, a held one let go of at
+  // once —, and the new one shows nothing until every one of its files has settled
+  function reload(): void {
+    art.dispose();
+    posed = undefined;
+    const files = filesNow();
+    current = makeLoad(files, settings.slow);
+    art = makeArt(files);
+    stage.scene.add(art);
+    readOut(art, undefined);
+    settle(art, performance.now());
+  }
+
+  // --- the frame -------------------------------------------------------------------------------
+
+  // the preview shows the shelf leaning, in the middle of a roll
+  const PREVIEW_TIME = 1.4;
+
+  display.onRenderFrame((frame) => {
+    sr.resize(frame.width, frame.height, frame.pixelRatio);
+    sr.updateFrame(frame.now, frame.deltaTime, frame.frameNo);
+    if (posed !== undefined) pose(posed, isPreview ? PREVIEW_TIME : frame.now);
+    // after the stage's frame: the plane and the stack are laid out, the poses uploaded
+    art.update();
+    sr.renderTo(frame.renderer);
+  });
+
+  // --- the controls ----------------------------------------------------------------------------
+
+  const gui = new GUI({container: getDemoUi(), title: 'stage art: layer files'});
+  parts.onDispose(() => gui.destroy());
+  gui.add(settings, 'slow').name('slow load').onChange(reload);
+  gui.add(settings, 'broken').name('break a file').onChange(reload);
+  gui.add({reload}, 'reload').name('load again');
+
+  await display.start();
+
+  if (!display.isDisposed) {
+    Object.assign(window, {display, stage});
+    Object.defineProperty(window, 'art', {get: () => art, configurable: true});
+  }
+</script>

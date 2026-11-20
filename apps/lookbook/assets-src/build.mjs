@@ -28,6 +28,7 @@ const DEMOS = [
   'stage-art-machine',
   'stage-art-aseprite',
   'stage-art-depth',
+  'stage-art-layer-files',
 ];
 
 function parseArgs() {

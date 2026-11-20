@@ -1,6 +1,6 @@
 # twopoint5d lookbook
 
-The living documentation of `@spearwolf/twopoint5d`: 48 runnable demos, each linked to its
+The living documentation of `@spearwolf/twopoint5d`: 49 runnable demos, each linked to its
 own source, searchable by tags.
 
 ## Running it
@@ -14,8 +14,8 @@ repo-root `README.md`.
 ## What's in `src/`
 
 - `pages/index.astro` — the overview page, the only page using `Layout.astro`
-- `pages/demos/<name>.astro` — 48 demo pages, all built on `VanillaDemo.astro`
-- `pages/demos/_<name>.json` — 48 metadata files, one per demo page
+- `pages/demos/<name>.astro` — 49 demo pages, all built on `VanillaDemo.astro`
+- `pages/demos/_<name>.json` — 49 metadata files, one per demo page
 - `demos/` — the demo code itself, TypeScript, grouped by demo; the three map2d demos
   share `map2d/`
 - `components/` — the lookbook UI: the card grid, the tag cloud, search, and
@@ -26,7 +26,7 @@ repo-root `README.md`.
 - `styles/`
 
 Three path aliases resolve into `src/`: `~components/*`, `~layouts/*` and `~demos/*`,
-declared in `tsconfig.json`. All 48 demo pages import through them.
+declared in `tsconfig.json`. All 49 demo pages import through them.
 
 ## Generated assets
 
@@ -41,8 +41,9 @@ together.
   Blender bakes, with its cameras and a camera animation, and a survey map Blender renders with
   the diorama of the place it marks, a brass machine Blender renders part by part into a
   trimmed atlas, a vending machine painted as pixel art into one Aseprite file, which Aseprite
-  builds from a Lua script and exports split by layers, and a flooded station Blender renders plane
-  by plane into the groups of another such file, each with its depth. `assets-src/README.md` documents every
+  builds from a Lua script and exports split by layers, a flooded station Blender renders plane
+  by plane into the groups of another such file, each with its depth, and a shelf of specimen jars
+  Blender renders layer by layer into full-canvas PNGs, as a paint tool exports its layers. `assets-src/README.md` documents every
   output — formats, frame names, palette rows, insets, font metrics, cameras and clips — and is
   the reference a demo is built from.
 - The cut-outs of the demo `cardboard-parade`: `assets-src/cardboard/` builds them in Blender and
