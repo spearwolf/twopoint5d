@@ -26,7 +26,10 @@ import {description, title} from './_stage-art-aseprite.json';
       <p data-problems></p>
     </details>
     <div class="hud fixed bottom-4 left-4">
-      <p class="help">hover: light a layer · click: wobble it · click again: it wobbles on from where it stands</p>
+      <p class="help">
+        hover: light a layer · click: a part with a pivot slice wobbles about it, any other lights · click again: it wobbles on
+        from where it stands
+      </p>
       <p class="pacer" aria-live="off">
         <span>FramePacer</span>
         frames <b data-frames>0</b> · draws <b data-draws>0</b>
@@ -213,6 +216,13 @@ import {description, title} from './_stage-art-aseprite.json';
     );
   }
 
+  // a part the sheet hinges with a pivot slice; a layer without one turns about the middle of its box,
+  // and a wall or a pane of glass rocking about its middle is no part of the machine moving
+  function isHinged(layer: Layer): boolean {
+    const {box, pivot} = layer;
+    return box !== undefined && pivot !== undefined && (pivot[0] !== box.x + box.w / 2 || pivot[1] !== box.y + box.h / 2);
+  }
+
   // the wobbles under way, each started at the time of its click on the display's clock
   const wobbles = new Map<Layer, {track: ArtTrack; startedAt: number}>();
   const standing: ArtPose = {};
@@ -264,7 +274,7 @@ import {description, title} from './_stage-art-aseprite.json';
     drawingOut.classList.toggle('idle', !draw);
   });
 
-  // --- picking: a hover lights a layer, a click wobbles it ---------------------------------------
+  // --- picking: a hover lights a layer, a click wobbles a hinged one ----------------------------
 
   // made at the first pick, once the display has its renderer
   let picker: SpritePicker | undefined;
@@ -347,7 +357,9 @@ import {description, title} from './_stage-art-aseprite.json';
       const at = display.now;
       const layer = await layerAt(pointerOf(event));
       if (display.isDisposed || layer === undefined) return;
-      startWobble(layer, at);
+      // a layer without a hinge answers with the light alone — on a touch screen, the only hover it gets
+      if (isHinged(layer)) startWobble(layer, at);
+      else light(layer);
     },
     {signal},
   );

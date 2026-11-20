@@ -618,7 +618,7 @@ export {hover};
 
 A `pick()` answers asynchronously, from the gpu, so it is a tool for a click or a hover, not for
 every layer in every frame. The lookbook demo *stage art: one Aseprite file* lights the layer under
-the pointer this way and starts a wobble track on the one clicked.
+the pointer this way and starts a wobble track on the one clicked, where it has a pivot slice.
 
 ### A pestle in a circle
 
