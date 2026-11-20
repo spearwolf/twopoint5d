@@ -1,16 +1,112 @@
 # Proposal: art layers on a stage — `StageArt`, `artTrack()` and `animationFrameAt()`
 
-Status: **specified** — agreed on, with the decisions of the design discussion in §2.6; the build
-follows the phases of §10. From
-[issue #57](https://github.com/spearwolf/twopoint5d/issues/57), which brings a reference
-implementation out of a private point-and-click game (`stage-sprites.ts`, `stage-motion.ts`); this
-proposal takes over its idea and its contract, builds it on what the library already has (§2.7),
-and adds what makes it 2.5D: layers at a depth of their own under a `ParallaxProjection`, which
-keep the painted composition at rest and come apart when the camera moves.
+Status: **implemented** — see [`docs/stage-art.md`](../stage-art.md), the guide of its own: the
+scenarios (a scene out of an Aseprite file, out of layer PNGs, out of a packed atlas, loose props,
+moving a layer, a timeline with a scrubber, a strip of steam, a painted scene made deep, art on a
+`top-left` stage, drawing on demand, a click on a layer, a pestle in a circle, reloading a sheet
+while the page runs), the cheat sheet and the reference; [`docs/stages.md`](../stages.md), "Depth
+under a parallax projection"; [`docs/sprites.md`](../sprites.md), "Animated frames";
+[`docs/display.md`](../display.md), "Painted layers that move" in "Drawing on demand"; the Vitest
+specs listed in §11.1, among them `src/stage-art/hot-path-allocations.stage-art.spec.ts`; the
+fixtures under `src/stage-art/fixtures/` — a real Aseprite split-layer export and a free-tex-packer
+export of one scene, their generators, and in its `README.md` the facts of both exports; the browser
+test `packages/twopoint5d-testing/test/stage-art.test.js`; and the lookbook demos *stage art: the
+listening machine*, *stage art: one Aseprite file*, *stage art: the drowned platform* and *stage
+art: layer files*. From [issue #57](https://github.com/spearwolf/twopoint5d/issues/57), which
+brings a reference implementation out of a private point-and-click game (`stage-sprites.ts`,
+`stage-motion.ts`); this proposal takes over its idea and its contract, builds it on what the
+library already has (§2.7), and adds what makes it 2.5D: layers at a depth of their own under a
+`ParallaxProjection`, which keep the painted composition at rest and come apart when the camera
+moves.
+
+Where the build left the first draft:
+
+- the depth limit `δ ≤ −D` holds under `compensateDepth: false` as well, since the camera of the
+  `ParallaxProjection` stands at `D` either way — only an art without a `ParallaxProjection` has
+  none (§2.5, §3.3, §5.7); `update()` runs after the stage's `updateFrame()`, in which the
+  projection works `D` out — an `update()` before it lays a new `D` out a frame late (§2.5, §3.1);
+- `AsepriteJson.parse()` keeps the Aseprite `meta` of every atlas it builds, in a module `WeakMap`
+  that the internal `asepriteMetaOf()` reads (§2.6, §4.1): the store's `'aseprite'` adapter dropped
+  it, and an atlas parsed by hand is read the same way; no public change;
+- `StageArt` is generic over its `features` (§3.1, §3.7): `layer.sprite` carries their api
+  (`ArtLayer<Extra>`, `StageArtExtraApi`), so a write through it needs no cast; a kind with further
+  features is cached weakly, one level per feature object, so a feature made inline leaves nothing
+  behind;
+- a `{store, id}` or promise source without `only` knows no layer names until it has loaded:
+  `layer()` and `set()` throw until then, saying that the source is still loading; names in `only`,
+  and the layers of a list of files, can be posed at once (§3.1, §5.5);
+- an option `renderer` (§3.1, §5.1): the atlas of a files source reads its size limit from the
+  device of the renderer, since `WebGPURenderer` has no `capabilities.maxTextureSize`; 4096 without
+  one, or before its device is known;
+- loose layers are a `layers` list beside a store item or an atlas — `{store, id, layers}`,
+  `{atlas, texture, layers}` — rather than a source of their own with an optional atlas, and the
+  options `only` and `layers` are refused beside them (§3.2, §4.5);
+- a `frame` set before the frames are known is checked as a whole number of 0 or more; a kept frame
+  beyond the layer's frames at the load is a problem, and the layer shows frame 0 (§3.3);
+- `artTrack()` also refuses a later key that sets a field the first key leaves out — the track
+  would pass it over without a word —, and `sample()` and `isMoving()` refuse a time that is no
+  finite number (§3.4); so the example of §3.4 sets `frame: 0` in its first key;
+- `isMoving()` is `false` for a track of duration 0 under every playback, since such a track never
+  changes; "always for `'loop'` and `'pingpong'`" holds for a duration above 0 (§3.4);
+- `animationFrameAt(timing, seconds)` answers the frame the shader picks for
+  `time + animOffset = seconds` — the draft wrote `time − animOffset`; `AnimatedFrames` adds the
+  offset (§3.5) —, and refuses a `seconds` that is no finite number (§8);
+- `takeChanged()` answers as well for an empty cel that a layer turns to or from, and for a new
+  atlas or texture of a followed store item while a layer is shown (§3.6);
+- the Aseprite export puts `--split-layers` before the input file — Aseprite applies it only to the
+  files it opens after it — and adds `--ignore-empty`, without which Aseprite writes an empty cel as
+  a trimmed entry of 1 × 1 at 0, 0, which the reader takes for an empty cel (§4.1); a group of
+  `meta.layers` is a depth source, never a layer; tags are listed once per sprite, so every layer has
+  every tag of the sheet; a frame grown by `--inner-padding` is read inset by the padding, and one
+  grown otherwise is a problem naming `--inner-padding` (§4.1, §4.3); the facts of the export, which
+  the draft left to verify at the start of the build, are written down beside the fixtures, in
+  `src/stage-art/fixtures/README.md` (§4.1);
+- a file `<layer>-<suffix>` is a frame of `<layer>` only after the file `<layer>` in the list —
+  listed before it, it is a layer of its own; a `#` in a file name goes out as `%23`, which some dev
+  servers (Vite) answer with a 404, so a numbered strip is named `-N` there; the canvas is the size
+  of the first file that loaded; the layers show once every file has arrived or failed, since the
+  atlas is sized from all boxes (§4.2, §5.5);
+- the names of §4.2 are read by one reader that a list of files and a trimmed atlas share; in a
+  trimmed atlas, whose frame order is the packer's, a `-suffix` frame joins its layer wherever the
+  packer wrote it, and a packed atlas names its stacking order with `only` (§4.3);
+- `at` and `pxPerUnit` in the `layers` overrides of an atlas are refused — they belong to loose
+  layers —; an override with `frames` for a name the source lacks makes a layer of those frames, and
+  only one without them is a problem (§4.4);
+- the box of a loose layer is the union of its frames — the size of the first frame where they
+  agree —, and its `pivot` is in pixels of the first frame as it was before the packer trimmed it
+  (§4.5);
+- a frame is prepared against the box of its layer — the union of the boxes of its frames —, never
+  against the canvas, by `prepareLayerFrame()` instead of `prepareSpriteFrame()` (§4.3, §5.1);
+- pictures of files that do not fit into the largest atlas allowed are one problem of the source,
+  worded as the refusal would be, since an asynchronous load cannot throw at the caller (§5.1);
+- the art takes its first load of a store item through `store.acquireAsync()`, then follows the
+  item with `store.on()` and lets the lease go: one hold while it lives (§5.5);
+- the module holds files beyond the draft's list — `ArtLayer.ts`, `artPose.ts`, `artOptions.ts`,
+  `loadLayerFiles.ts` and the fixtures —; `stage-art` imports `vertex-objects`, to write the
+  rotation and the fade into their buffers without allocation, and from `stage` no
+  `OrthographicProjection`; `DynamicAtlas` shares its shelf packing with a dry run, `packsInto()`;
+  the allocation case of `animationFrameAt()` sits beside its module, in
+  `src/texture/hot-path-allocations.spec.ts` (§6, §11.1);
+- after `dispose()`, `set()` and `apply()` still refuse what they cannot use, and then write nothing
+  (§7) — the rule of the resource lifecycle that a mutating method still turns invalid input away;
+- refusals the draft did not name: options with a key no option has, `only` naming more than 8192
+  layers, a list of files naming more than 8192, a `material` that sets what is the art's own, a
+  `renderer` that is no renderer (§8); a source of more than 8192 layers is a problem, and the art
+  takes the first 8192 (§3.8);
+- the demos (§9): the files demo shows the shelf whole once every file has settled, not layer by
+  layer, and names its strip `-N`; the Aseprite and the depth demo build their sheets as `.aseprite`
+  files from Lua and export them through the Aseprite CLI, the depth demo out of renders of Blender;
+  the machine runs a fifth motion, the paper strip; the Aseprite demo wobbles only a part with a
+  pivot slice;
+- a reload of a followed store item (§5.5, phase C in §10) replaces frames, boxes, pivots, tags and
+  rests; a field the caller moved off its rest keeps its value, a field still at rest takes the new
+  rest; a layer the reload lacks stays posed and hidden with a problem; a layer new in the reload
+  stays out, with one problem saying that a new `StageArt` takes it; `problems` is replaced per
+  reload.
 
 An illustrator delivers a scene as layers: a table, two carafes, a ladle, a strip of steam, each
-with its place in the picture and a point it turns about. Today a user of the library turns that
-into sprites by hand — a kind, an atlas, a size and an anchor per layer worked out from pixels, a
+with its place in the picture and a point it turns about. Without the art a user of the library
+turns that into sprites by hand — a kind, an atlas, a size and an anchor per layer worked out from pixels, a
 conversion into units, `touchVO()` for every static attribute, a sort for the stacking order, and a
 flag of their own for drawing on demand. `StageArt` does that once: it reads the layers out of the
 picture they were painted in, draws them as one `FeatureSprites` in one draw call, lies in the
@@ -88,9 +184,9 @@ The plane comes from `projection` (§2.5), or from `plane`, or is `'xy|bottom-le
 `'xy|top-left'` a painted scene therefore shows upright and unmirrored, turns clockwise for a
 positive `deg`, and needs neither `Flip` nor `side: DoubleSide`: its quads face the camera as they
 do under `'xy|bottom-left'`. The art places the whole canvas through the group — move, turn or
-scale `art` as any object; the turn of the mesh inside it is the art's own. The art keeps no
-reference to the plane after the turn, save to turn the mesh anew when `plane` or `projection`
-change (§3.1).
+scale `art` as any object; the turn of the mesh inside it is the art's own. The art keeps a copy
+of the plane it turned the mesh to, and turns the mesh anew in the `update()` that finds another
+plane in force — a swap of `plane` or `projection` (§3.1), or a plane changed in place (§5.6).
 
 ### 2.3 A layer, its box, its pivot, its frames
 
@@ -139,9 +235,11 @@ camera of an animation studio, out of a flat painting.
   about the focus: its position `focus + (p − focus) · k`, its size `size · k`. At rest the camera
   sees it at `getScaleFactor(D + δ) = D / (D + δ)` of that — as painted.
 - **`D`** is the distance the `ParallaxProjection` placed its camera at for the last view —
-  `distanceToProjectionPlane` after its fallbacks, which a new public getter of the projection
-  answers (§3.9). The art reads it in `update()`, so a change of the specs or a resize that changes
-  it lays the depth layers out anew.
+  `distanceToProjectionPlane` after its fallbacks, which a public getter of the projection answers
+  (§3.9). The art reads it in `update()`, so a change of the specs or a resize that changes it lays
+  the depth layers out anew. The projection works `D` out in the stage's `updateFrame()`, so
+  `update()` runs after it — in a listener of `OnStageUpdateFrame`, or after the frame of a
+  `StageRenderer` driven by hand; an `update()` before it lays a new `D` out a frame late.
 - **The focus** is the point of the art frame the camera looks at in its rest: the origin of the
   art, where the art stands at the origin of the plane — the default — and the camera rests on the
   plane's axis. An art moved away from the origin of the plane, or a stage whose rest looks
@@ -155,18 +253,23 @@ camera of an animation studio, out of a flat painting.
   among layers of one depth (§5.2). A layer painted above another but put behind it goes under it;
   the art says so on the console once per layer, at the first `update()` that finds it so, since
   the picture at rest then differs from the painting.
-- **Limits.** A depth at or in front of the camera (`δ ≤ −D`) cannot be drawn: `set()` refuses it
-  where `D` is known, and a layer a later `D` leaves there is hidden and warned about once, until a
-  depth or a `D` brings it back in front of the camera. Only the plane is pixel-exact under
-  `pixelSnap`; a layer at a depth is scaled by `k` and lands between the pixels.
+- **Limits.** A depth at or in front of the camera (`δ ≤ −D`) cannot be drawn: `set()` and
+  `apply()` refuse it where `D` is known — under `compensateDepth: false` as well, since the camera
+  of the `ParallaxProjection` stands at `D` either way; only an art without a `ParallaxProjection`
+  has no limit. A layer a later `D` leaves there is hidden and warned about once where it would be
+  shown, until a depth or a `D` brings it back in front of the camera. Only the plane is
+  pixel-exact under `pixelSnap`; a layer at a depth is scaled by `k` and lands between the pixels.
 
 ### 2.6 Settled in the discussion, and why
 
 - **The default ease of a key is `'linear'`**, as for `CameraTrackKey`, with `ease` per track for a
   smooth default (§3.4): one field name, one meaning in the library.
-- **The art reads a split-layer Aseprite json itself** (§4.1). `AsepriteJson.parse()` stays as it
-  is: its atlas of such a sheet is right, and its tag animations, which would mix the layers, are
-  not used by the art.
+- **The art reads a split-layer Aseprite json itself** (§4.1). The atlas `AsepriteJson.parse()`
+  builds of such a sheet is right, and its tag animations, which would mix the layers, are not used
+  by the art. What the art needs beyond the atlas — `meta.layers`, `frameTags`, `slices` — `parse()`
+  keeps per atlas it builds, in a module `WeakMap` that the internal `asepriteMetaOf(atlas)` reads:
+  the store's `'aseprite'` adapter and an atlas parsed by hand serve the art alike, and the public
+  api of `AsepriteJson` does not change.
 - **Every plane in phase A** (§2.2): one turn of the mesh serves all of them, `'xy|top-left'` — the
   plane of UI, of canvas coordinates — included.
 - **Depth per layer in phase A** (§2.5): it is what makes art layers 2.5D rather than a sprite
@@ -203,52 +306,66 @@ each picture through a callback. Nearly every part of it has a counterpart in th
 ### 3.1 `StageArt`
 
 ```ts
-class StageArt extends Group {
-  constructor(source: StageArtSource | Promise<StageArtSource>, options?: StageArtOptions);
+class StageArt<Features extends SpriteFeature = never> extends Group {
+  constructor(source: StageArtSource | Promise<StageArtSource>, options?: StageArtOptions<Features>);
 
-  readonly mesh: FeatureSprites<…>; // the art owns and disposes it; hand it to a SpritePicker
+  readonly mesh: FeatureSprites<StageArtSpriteApi & StageArtExtraApi<Features>>; // the art owns it; hand it to a SpritePicker
   readonly names: readonly string[]; // the layers, bottom first as painted
   readonly canvas: {width: number; height: number} | undefined;
-  readonly loaded: Promise<void>; // every picture loaded or failed; never rejects
-  readonly problems: readonly StageArtProblem[];
+  readonly loaded: Promise<void>; // every picture loaded or failed, or the art disposed; never rejects
+  readonly problems: readonly StageArtProblem[]; // replaced by each reload of a store item (§5.5)
+  readonly isDisposed: boolean;
 
   projection: IProjection | undefined; // the plane and the D of §2.5; a swap takes effect in update()
-  plane: ProjectionPlane | ProjectionPlaneDescription; // without a projection; default 'xy|bottom-left'
+  get plane(): ProjectionPlane; // the plane the art lies in
+  set plane(plane: ProjectionPlane | ProjectionPlaneDescription); // without a projection; default 'xy|bottom-left'
 
-  layer(name: string): ArtLayer; // the handle; throws for a name it does not know, listing the names
-  layerOf(sprite: object): ArtLayer | undefined; // the layer of a sprite a SpritePicker answered
+  layer(name: string): ArtLayer<StageArtExtraApi<Features>>; // throws for a name it does not know, listing the names
+  layerOf(sprite: object): ArtLayer<StageArtExtraApi<Features>> | undefined; // the layer of a sprite a SpritePicker answered
   set(name: string, pose: ArtPose): void; // = layer(name).set(pose)
   apply(name: string, track: ArtTrack, seconds: number): void; // samples the track into the layer
   reset(): void; // every layer back to its rest
 
   takeChanged(): boolean; // did the picture change since the last call? (§3.6)
-  update(): void; // once per frame before the render: depth layout, sort, mesh.update()
+  update(): void; // once per frame, after the stage's updateFrame() and before the render
   dispose(): void;
 }
 
-interface StageArtOptions {
+interface StageArtOptions<Features extends SpriteFeature = SpriteFeature> {
   name?: string; // in messages: StageArt "kitchen": …
   pxPerUnit?: number;
   origin?: readonly [number, number];
+  focus?: readonly [number, number]; // artwork pixels; default origin (§2.5)
   projection?: IProjection; // stage.projection: the plane and the depth compensation
   plane?: ProjectionPlane | ProjectionPlaneDescription; // without a projection
-  focus?: readonly [number, number]; // artwork pixels; default origin (§2.5)
   compensateDepth?: boolean; // default true
-  layers?: Record<string, ArtLayerOptions>; // sparse overrides by name (§4.4)
   only?: readonly string[]; // the layers to take, in this stacking order (§4.4)
-  features?: readonly SpriteFeature[]; // more features for the kind: Tint, Flash, … (§3.7)
-  material?: …; // the material parameters of FeatureSprites: transparent, depthTest, …
+  layers?: Readonly<Record<string, ArtLayerOptions>>; // sparse overrides by name (§4.4)
+  features?: readonly Features[]; // more features for the kind: Tint, Flash, … (§3.7)
+  material?: Omit<FeatureSpritesMaterialParameters, 'textures' | 'placement' | 'resources' | 'pass'>;
+  renderer?: WebGPURenderer; // the size limit of the atlas of a files source (§5.1)
 }
 ```
 
-`ArtLayer` is the handle a hot path keeps: `set(pose)`, `apply(track, seconds)`, `reset()`,
-`frameAt(tag, seconds)` (§3.5), the read-only `name`, `rest`, `box`, `pivot`, `frameCount`,
-`tags`, `loaded`, and `sprite` — the sprite handle of the mesh, for a feature handed in through
-`features` (`layer.sprite.setFlash(1, 1, 1, 0.6)`). A write through `sprite` is the caller's: it
-does not go through the change detection, and the caller reports it to a pacer (§3.6).
+`ArtLayer` is the handle a hot path keeps, the same object for the life of the art: `set(pose)`,
+`apply(track, seconds)`, `reset()`, `frameAt(tag, seconds)` (§3.5), the read-only `name`, `rest`,
+`box`, `pivot`, `frameCount` — an empty cel counts —, `tags` — the names of the tags of the layer —,
+`loaded`, and `sprite` — the sprite handle of the mesh, for a feature handed in through `features`
+(`layer.sprite.setFlash(1, 1, 1, 0.6)`), typed by them (§3.7). Until the load `rest`, `box` and
+`pivot` are `undefined`, `frameCount` is 0 and `tags` is empty; a reload of a store item answers
+them anew (§5.5). A write through `sprite` is the caller's: it does not go through the change
+detection, and the caller reports it to a pacer (§3.6).
 
 A pose for a layer whose picture has not arrived is kept and shown once the picture is there; a
-pose for a layer that failed is kept as well, and nothing is drawn.
+pose for a layer that failed is kept as well, and nothing is drawn. A layer is known by its name —
+and can be posed — at once where the art can name it without the source: the names of `only`, and
+the layers of a list of files (§4.2). A `{store, id}` or a promise source without `only` knows no
+names until it has loaded: `layer()` and `set()` throw until then, saying that the source is still
+loading.
+
+`update()` runs after the stage's `updateFrame()`, which works out the `D` it reads (§2.5): in a
+listener of `OnStageUpdateFrame`, or between `sr.updateFrame()` and the render in a frame loop of
+one's own.
 
 `projection` and `plane`: with a projection the art takes its plane and ignores `plane`; an art
 handed both says so once on the console. A stage whose projection is swapped hands the new one to
@@ -260,11 +377,17 @@ draws depth uncompensated (§2.5).
 
 ```ts
 type StageArtSource =
-  | {store: TextureStore; id: string} // an atlas item: Aseprite with split layers (§4.1) or a trimmed atlas (§4.3)
-  | {atlas: TextureAtlas; texture: Texture} // the same, already loaded
-  | {files: readonly string[]; baseUrl?: string} // full-canvas PNGs of a paint tool (§4.2) — phase B
-  | {layers: readonly ArtLayerDef[]; atlas?: …} // loose layers (§4.5)
+  // an atlas item: Aseprite with split layers (§4.1) or a trimmed atlas (§4.3); with layers, loose layers (§4.5)
+  | {readonly store: TextureStore; readonly id: string; readonly layers?: readonly ArtLayerDef[]}
+  // the same, already loaded
+  | {readonly atlas: TextureAtlas<unknown>; readonly texture: Texture; readonly layers?: readonly ArtLayerDef[]}
+  // full-canvas PNGs of a paint tool (§4.2)
+  | {readonly files: readonly string[]; readonly baseUrl?: string};
 ```
+
+The art may be handed a promise of any of them. An atlas that `AsepriteJson.parse()` filled is read
+as an Aseprite sheet (§4.1), any other as a trimmed atlas (§4.3). A source with `layers` names its
+layers itself: the options `only` and `layers` are refused beside it.
 
 ### 3.3 Setting a pose
 
@@ -279,20 +402,22 @@ carafe.set({x: 412, y: 380, deg: 35, frame: 1});
 art.set('window', {depth: 600}); // far behind, still where it was painted at rest
 ```
 
-`set()` checks each field as the library checks input (`AGENTS.md`, "Invalid input is refused"):
-a field that is no finite number, an `opacity` outside `0 … 1`, a `frame` that is no whole number
-or outside the frames of the layer, an `order` that is no whole number from −1024 to 1023 (§5.2), a
-`depth` at or in front of the camera where `D` is known (§2.5), and a key of the pose that is no
-field of it — `rotation` for `deg` — throw, naming the layer and the field, and the layer keeps
-what it held. On the hot path the checks stay inline (§5.4).
+`set()` checks each field as the library checks input (`AGENTS.md`, "Invalid input is refused"),
+every field before it writes one: a field that is no finite number, an `opacity` outside `0 … 1`, a
+`frame` that is no whole number of 0 or more — or, once the frames of the layer are known, no index
+into them —, an `order` that is no whole number from −1024 to 1023 (§5.2), a `depth` at or in front
+of the camera where `D` is known (§2.5), a `visible` that is no boolean, and a key of the pose that
+is no field of it — `rotation` for `deg` — throw, naming the layer and the field, and the layer
+keeps what it held. A `frame` kept from before the load that lies beyond the frames of the layer is
+a problem (§3.8), and the layer shows frame 0. On the hot path the checks stay inline (§5.4).
 
 ### 3.4 Tracks: `artTrack()` and `rampAt()`
 
 ```ts
 const tilt = artTrack(
   [
-    {at: 0, x: 412, y: 380, deg: 0},
-    {at: 0.6, deg: 35, ease: 'ease-out'}, // x and y hold
+    {at: 0, x: 412, y: 380, deg: 0, frame: 0}, // every field a later key sets
+    {at: 0.6, deg: 35, ease: 'ease-out'}, // x, y and frame hold
     {at: 1.4, deg: 95, frame: 1}, // the carafe empties as it pours
     {at: 2.2, deg: 0, frame: 1},
   ],
@@ -323,7 +448,7 @@ interface ArtTrackOptions {
 interface ArtTrack {
   readonly duration: number; // the time of the last key
   sample(seconds: number, target: ArtPose): ArtPose; // writes the fields the track has, answers target
-  isMoving(seconds: number): boolean; // within its keys, or always for 'loop' and 'pingpong'
+  isMoving(seconds: number): boolean; // within its keys; always for 'loop' and 'pingpong' above duration 0
 }
 
 function rampAt(seconds: number, start: number, duration: number, ease?: Easing): number; // 0 … 1
@@ -339,12 +464,17 @@ function rampAt(seconds: number, start: number, duration: number, ease?: Easing)
   at the key that sets them.
 - **Before the first key** the track shows the first key, **after the last** the last — or runs
   on under `'loop'` and `'pingpong'`, the playback names of the atlas animations.
+- **`isMoving(t)`** is `true` within the keys, and always under `'loop'` and `'pingpong'` for a
+  track of a duration above 0; a track of duration 0 never changes and answers `false` under every
+  playback.
 - **Pure.** `sample(t)` depends on `t` alone: a track overtaken by the next is left, not cancelled;
   a scrubber, a replay and a test get the same picture for the same time.
 - **Refused** by `artTrack()`, before anything is built: keys that are no list or empty, an `at`
   that is no finite number of 0 or more or smaller than the one before, a field as `set()` refuses
-  it — save the depth limit, which needs a camera —, an unknown key field, an `ease` that
-  `easingOf()` refuses, a playback that is none of the three. `sample()` takes any finite time.
+  it — save the depth limit, which needs a camera and is checked by `apply()` —, a field a later key
+  sets and the first leaves out — the track has no value to start it from, and would pass it over
+  without a word —, an unknown key field, an `ease` that `easingOf()` refuses, a playback that is
+  none of the three. `sample()` and `isMoving()` take any finite time and refuse any other.
 - The easing is the shared one of `src/utils/easing.ts` (`camera-rig.md` §4.9), evaluated through
   `applyEasingInPlace()`.
 
@@ -366,13 +496,16 @@ interface AnimationTiming {
 ```
 
 The index of the frame an animation shows at `seconds` after its start — the frame `AnimatedFrames`
-picks in the shader for `time − animOffset = seconds`, with its playback and per-frame durations:
-`'loop'` wraps, `'once'` holds the last frame, `'pingpong'` turns at both ends. A
-`FrameBasedAnimationInfo` is an `AnimationTiming`, so the function serves every sprite animated on
-the CPU, not only art layers. A spec holds it frame by frame against the shader's arithmetic (§11).
+picks in the shader for `time + animOffset = seconds` (the shader adds the offset), with its
+playback and per-frame durations: `'loop'` wraps, `'once'` holds the last frame, `'pingpong'` turns
+at both ends. A negative `seconds` is before the start, where `'once'` holds its first frame; a
+`duration` of 0 is a still image and answers 0. A `FrameBasedAnimationInfo` is an
+`AnimationTiming`, so the function serves every sprite animated on the CPU, not only art layers. A
+spec holds it frame by frame against the shader's arithmetic (§11).
 
 `layer.frameAt(tag, seconds)` is the same for a tag of the layer (§4.1): the index into the frames
-of the layer, ready for `set({frame})`.
+of the layer, ready for `set({frame})`. It throws for a tag the layer does not have, listing its
+tags, and before the load.
 
 ### 3.6 Drawing on demand: `takeChanged()`
 
@@ -385,9 +518,14 @@ call,
   is no change, and neither is a `frame` that a steam strip at 8 frames per second keeps for seven
   of every eight frames at 60;
 - a layer turned from shown to hidden or back — through `visible`, through an `opacity` from or to
-  0, through its picture arriving, through a `D` that leaves it behind the camera or brings it back;
-- the order of the stack changed;
-- `update()` laid the depth layers out anew for a new `D`, plane or projection.
+  0, through an empty cel as its frame, through its picture arriving or going with a reload, through
+  a `D` that leaves it behind the camera or brings it back;
+- a shown layer changed its place in the stack — its `depth` or its `order`;
+- `update()` turned the mesh to another plane, or laid the depth layers out anew for a new `D`;
+- a store item the art follows brought a new atlas or texture while a layer is shown (§5.5).
+
+A layer is shown while it is `visible`, its picture is there, its `opacity` is above 0 and its frame
+is no empty cel. After `dispose()` it answers `false`.
 
 A hidden layer that moves changes nothing on the screen and answers nothing. The art writes in the
 step itself, so the step reports what it writes (`drawing-on-demand.md` §3.5). A write through
@@ -409,9 +547,15 @@ const name = hit && art.layerOf(hit.sprite)?.name; // 'carafe5', or undefined
 ```
 
 `features` adds features to the kind of the art — `Flash` for a hover glow, `Tint` for a night
-version, `PaletteSwap` — whose values the caller writes through `layer.sprite`. A feature that
-takes a slot the kind fills — a second frame source, another placement — is refused by
-`defineSprite()`, and its message names the feature.
+version, `PaletteSwap` — whose values the caller writes through `layer.sprite`. `StageArt` is
+generic over them: `new StageArt(source, {features: [Flash]})` is a `StageArt<typeof Flash>`, its
+layers `ArtLayer<FlashApi>`, so `layer.sprite.setFlash()` needs no cast. A feature that takes a
+slot the kind fills — a second frame source, another placement — is refused by `new StageArt()`
+in the words of `defineSprite()`, naming the feature, and so is an entry that is no feature. The
+kind without further features is built once for every art; a kind with them is built once per list
+of feature objects and kept in a trie of weak maps, one level per feature object
+(`stageArtKind.ts`), so arts with the same features share it and a feature made inline leaves
+nothing behind once it and its art are gone.
 
 ### 3.8 `loaded` and `problems`
 
@@ -425,24 +569,29 @@ interface StageArtProblem {
 
 - **Hidden until loaded.** A layer is drawn hidden (`Visible`) until its frames are there: no grey
   or white quad flashes up while a picture loads.
-- **A failure hides one layer.** A file that does not load (§4.2), a layer an override names that
-  the source does not have, a pivot slice that names no layer, a depth in the file that is no
-  number: the layer stays hidden — or, for a depth, stays on the plane —, its poses are kept, and
-  the failure goes into `problems` — also on the console, once per art, through `console.warn`,
-  naming the art and the count.
+- **A failure hides one layer, or leaves one thing out.** A file that does not load (§4.2), a name
+  in `only` the source does not have, a depth in the file that is no number, a pivot slice that
+  names no layer: the layer stays hidden — or, for a depth, stays on the plane; for a marker, the
+  marker is unused —, its poses are kept, and the failure goes into `problems` — also on the
+  console, once per art and once per reload, through `console.warn`, naming the art and the count.
+  A file that fails in a layer of more frames leaves the others shown.
 - **A source that fails as a whole** — the store item cannot load, the promise of the source
-  rejects — leaves every layer hidden and one problem without a layer; `names` is then empty unless
-  `only` named the layers.
-- `loaded` resolves once every picture loaded or failed. It never rejects; `problems` says what
-  failed.
+  rejects, an Aseprite sheet whose frames are named after no layer, pictures of files too large for
+  one atlas (§5.1) — leaves every layer hidden and one problem without a layer; `names` is then
+  empty unless `only` or a list of files named the layers.
+- **More than 8192 layers** in a source are a problem; the art takes the first 8192 (§5.2).
+- `loaded` resolves once every picture loaded or failed, or the art is disposed. It never rejects;
+  `problems` says what failed. The guide lists every problem and what the art does with it
+  (`docs/stage-art.md`, "`loaded` and `problems`").
 
 ### 3.9 `ParallaxProjection#distanceToProjectionPlane`
 
 A read-only getter: the distance from the camera to the plane the projection placed its camera at
-for the last view, after the fallbacks of its specs — `NaN` before the first view, as
-`getScaleFactor()` answers. The art needs it for `D` (§2.5), and a user who works out a depth of
-their own needs it too; today it is private, and only `getScaleFactor(d) = D / d` lets it out by a
-detour. `docs/stages.md`, "Depth under a parallax projection", names it.
+for the last view with an area, after the fallbacks of its specs — `300` for specs that name no
+distance or one no camera can be placed at, `NaN` before the first view, as `getScaleFactor()`
+answers. The art needs it for `D` (§2.5), and a user who works out a depth of their own needs it
+too; without it only `getScaleFactor(d) = D / d` would let it out, by a detour.
+`docs/stages.md`, "Depth under a parallax projection", names it.
 
 ## 4. Authoring without a schema
 
@@ -455,15 +604,20 @@ what the picture cannot say. Four ways in, from no code at all to a short list:
 | Aseprite | a sheet with split layers, trimmed, with layers, tags and slices (§4.1) | names, stacking order, boxes, pivots, depths, frames, animations | nothing |
 | any paint tool | one PNG of the full canvas per layer (§4.2) | boxes (trimmed at load), pivots from marker layers, depths from file names | the list of file names |
 | any paint tool + a packer | a trimmed atlas over those PNGs (§4.3) | names, boxes, depths from frame names | the stacking order, where it is not the order of the atlas |
-| loose props | an atlas or files | the frames | a pivot and a place per layer (§4.5) |
+| loose props | an atlas | the frames | a pivot and a place per layer (§4.5) |
 
 ### 4.1 Aseprite: the file is the layout
 
 ```sh
-aseprite -b kitchen.aseprite --split-layers --trim \
+aseprite -b --split-layers --trim --ignore-empty kitchen.aseprite \
   --sheet kitchen.png --data kitchen.json --format json-array \
   --filename-format '{layer}#{frame}' --list-layers --list-tags --list-slices
 ```
+
+`--split-layers` stands before the file: Aseprite applies it to the files it opens after it, and
+after the file it splits nothing. `--ignore-empty` leaves the cels without a pixel out of the sheet;
+without it Aseprite writes each as a trimmed entry of 1 × 1 at 0, 0, which the art reads as an
+empty cel all the same.
 
 ```json
 {"items": {"kitchen": {"atlasUrl": "kitchen.json", "atlasAdapter": "aseprite"}}}
@@ -474,12 +628,20 @@ const art = new StageArt({store, id: 'kitchen'}, {projection: stage.projection})
 ```
 
 - **Names and order** come from `meta.layers`, bottom first, as Aseprite lists them; a layer in a
-  group takes its plain name, and a name used twice is a problem of the source (§3.8).
+  group takes its plain name. A group stands in `meta.layers` too, before its first layer — an
+  entry a later entry names as its `group` is a group: a source of depth, never a layer. A name
+  used twice is a problem, and the art takes the first (§3.8). A sheet whose frames are named after
+  none of its layers — exported without `{layer}#{frame}`, or with `--split-layers` after the file —
+  is one problem of the source, not an art of empty layers.
 - **The box** of a frame is its `spriteSourceSize` within its `sourceSize`, the canvas — the place
-  Aseprite trimmed it from.
-- **The frames** of a layer are the frames named `{layer}#{n}`, in the order of `n`; empty cels,
-  which Aseprite leaves out of a trimmed sheet, show nothing. The box of a layer is the union of
-  the boxes of its frames, so a layer whose cels differ in size keeps one quad.
+  Aseprite trimmed it from. A frame larger in the sheet than that box — an export with
+  `--inner-padding` — is drawn from its picture alone, its tex coords inset by the padding, where it
+  is grown by one whole number of texels on every side; a frame grown otherwise is drawn shrunk and
+  is a problem of its layer that names `--inner-padding`. The same holds for a trimmed atlas (§4.3).
+- **The frames** of a layer are the frames named `{layer}#{n}`: frame `n` of the layer is frame `n`
+  of the sprite, so every layer has as many frames as the sprite. An empty cel shows nothing and
+  counts. The box of a layer is the union of the boxes of its frames, so a layer whose cels differ
+  in size keeps one quad.
 - **The pivot** is the pivot of the slice named like the layer, read by the rule of
   `setAnchorFromPivot()` (`docs/sprites.md`, "Anchor") — the bottom left corner of the pixel the
   pivot marks; without such a slice, the middle of the box.
@@ -488,15 +650,17 @@ const art = new StageArt({store, id: 'kitchen'}, {projection: stage.projection})
   its group, so a group is one plane of the multiplane and its layers move together; a layer with
   neither stands on the plane. The rest of the user data is left alone.
 - **The tags** are the frame ranges of `meta.frameTags`, with their direction, repeat and the
-  durations of their frames, per layer: `layer.frameAt('puff', t)`.
+  durations of their frames: `layer.frameAt('puff', t)`. Aseprite lists the tags once per sprite,
+  so every layer has every tag of the sheet. A tag that runs past the frames of the sprite, or steps
+  through a frame no layer has a picture of, is a problem and left out.
 - Hidden layers are not exported by Aseprite unless the export names `--all-layers`; the art
   takes what the sheet holds.
 
-The art reads this json itself, through the atlas the store's `'aseprite'` adapter builds and the
-`meta` it keeps (§2.6). *To verify at the start of phase A, against the Aseprite CLI, with a fixture
-committed beside the spec:* the exact fields of a split-layer export — `spriteSourceSize` per layer
-cel, the names of layers in groups and how a group appears in `meta.layers`, whether the user data
-of layers and groups is written there, and how `frameTags` count frames.
+The art reads this json itself, through the atlas `AsepriteJson.parse()` builds — the store's
+`'aseprite'` adapter calls it — and the `meta` it keeps per atlas (§2.6). What Aseprite writes for a
+split-layer sheet — the command, the frames, `meta.layers` with its groups and user data,
+`frameTags`, `slices`, the paddings — is written down beside the fixtures of a real export, in
+`src/stage-art/fixtures/README.md`, with the places in Aseprite's source that explain each fact.
 
 ### 4.2 Layer PNGs of any paint tool (phase B)
 
@@ -504,40 +668,56 @@ Photoshop ("Export Layers to Files"), Krita ("Export Layers"), GIMP, Affinity an
 each layer as a PNG of the full canvas, transparent around its picture. That is the layout:
 
 ```ts
-const art = new StageArt({
-  baseUrl: '/assets/kitchen/',
-  files: ['window@600.png', 'table.png', 'carafe5.png', 'carafe5.pivot.png', 'carafe5-empty.png', 'steam.png'],
-});
+const art = new StageArt(
+  {
+    baseUrl: '/assets/kitchen/',
+    files: ['window@600.png', 'table.png', 'carafe5.png', 'carafe5.pivot.png', 'carafe5-empty.png', 'steam.png'],
+  },
+  {renderer}, // the size limit of the atlas (§5.1)
+);
 ```
 
 - **The order of the list** is the stacking order, bottom first — the one thing a folder of PNGs
-  does not keep. A layer is named after its file without the extension and without a depth.
-- **Trimmed at load.** The art decodes each file (`createImageBitmap()`), finds the box of its
-  pixels with an alpha above 0, and packs only that box into a `DynamicAtlas` of its own (§5.1);
-  the place of the box on the canvas is the place of the layer. The canvas is the size of the
-  files, which must agree; a file of another size is a problem of that layer.
-- **Frames.** Files named `<layer>-<suffix>` after a file `<layer>` — `carafe5-empty.png` — are
-  further frames of `carafe5`, in the order of the list: frame 1, 2, …; their boxes join the box of
-  the layer. A numbered strip `steam#0.png` … `steam#7.png` is the same with numbers.
+  does not keep. A layer is named after its file without the extension and without a depth. The
+  art knows the names of the layers at once, from the list.
+- **Trimmed at load.** The art fetches every file at once, decodes each as it lands
+  (`createImageBitmap()`), finds the box of its pixels with an alpha above 0, and keeps only that
+  box; once every file has arrived or failed, it packs the boxes into a `DynamicAtlas` of its own
+  (§5.1), sized from all of them, and the layers show together. The place of the box on the canvas
+  is the place of the layer. The canvas is the size of the first file that loaded; a file of
+  another size is a problem with its `url`, and its layer is without that picture — a layer of that
+  file alone stays hidden, one of more frames shows the others.
+- **Frames.** Files named `<layer>-<suffix>` after the file `<layer>` in the list —
+  `carafe5-empty.png` — are further frames of `carafe5`, in the order of the list: frame 1, 2, …;
+  their boxes join the box of the layer. Listed before the file `<layer>`, a `-suffix` file is a
+  layer of its own. A numbered strip `steam#0.png` … `steam#7.png` is the same with numbers; its
+  `#` goes out as `%23`, which a server has to decode — the Vite dev server answers such a name with
+  a 404, so a strip named `steam.png`, `steam-1.png` … `steam-7.png` serves there.
 - **Depth in the name.** `<layer>@<depth>` — `window@600.png` — gives the layer a depth in artwork
   pixels; a negative one is written `@-120`. A layer renamed in the paint tool keeps its depth with
   its name.
 - **Pivot markers.** A file `<layer>.pivot.png` — a layer of the paint file with one dot on it,
   exported with the others — is not drawn: the middle of its box is the pivot of `<layer>`. A pivot
   in the picture is moved with the picture; a pivot in code is not.
-- One request per file; the browser fetches them side by side. A file that fails hides its layer
-  (§3.8).
+- One request per file; the browser fetches them side by side. A file that fails leaves its layer
+  without that picture (§3.8); `dispose()` aborts the requests still on their way (§7).
 
 ### 4.3 A trimmed atlas
 
 The same PNGs packed offline — TexturePacker or free-tex-packer with trimming — carry the canvas
-as `sourceSize` and the box as `spriteSourceSize` of each frame; the art reads them as in §4.1. Such
-an atlas keeps no stacking order of the paint file: the order is `only`, or the order of the frames
-in the json. Frame names follow §4.2 (`carafe5-empty`, `steam#3`, `carafe5.pivot`, `window@600`).
+as `sourceSize` and the box as `spriteSourceSize` of each frame; the art reads them as in §4.1,
+inner padding included. Frame names follow §4.2 (`carafe5-empty`, `steam#3`, `carafe5.pivot`,
+`window@600`), read by the reader a list of files uses as well. A packer writes its frames in the
+order it packed them, not in the order of the paint file: without `only` the layers stack in the
+order of their first frames in the json, so a packed atlas names its stacking order with `only`.
+For the same reason a name `<layer>-<suffix>` joins its layer wherever the packer wrote it — the
+layer of the longest name before a hyphen —, and a layer of numbered frames and named ones takes
+the numbered ones, a problem of its layer.
 
-The art draws the trimmed box as its quad and writes no trim margins into the sprite: a layer
-covers its picture, not the canvas, so a scene of thirty layers on a canvas of 1920 × 1080 does
-not shade thirty full screens.
+The art draws the box of a layer — the union of the boxes of its frames — as its quad, and
+prepares each frame with the margins of its own box inside that union, never the canvas margins
+(§5.1): a layer covers its picture, not the canvas, so a scene of thirty layers on a canvas of
+1920 × 1080 does not shade thirty full screens.
 
 ### 4.4 Code says only what the picture cannot
 
@@ -555,10 +735,14 @@ const art = new StageArt({store, id: 'kitchen'}, {
 ```
 
 `ArtLayerOptions` holds `pivot`, `depth`, `order`, `frames` (a list of frame names or a `RegExp`,
-for an atlas that does not follow §4.2), `rest` (a pose the layer starts in instead of the layout)
-and, for loose layers, `at` and `pxPerUnit`. An override beats what the file says. An override for
-a layer the source does not have is a problem (§3.8), so a renamed layer in the paint file shows up
-instead of silently losing its pivot.
+for an atlas that does not follow §4.2; a `RegExp` takes its frames in the natural order of their
+names, `steam#10` after `steam#9`), `rest` (a pose the layer starts in, and goes back to on
+`reset()`, instead of the layout) and, for loose layers alone, `at` and `pxPerUnit` — in the
+overrides of an atlas they are refused. An override beats what the file says. An override with
+`frames` for a name the source does not have makes a layer of those frames; one without them is a
+problem (§3.8), so a renamed layer in the paint file shows up instead of silently losing its pivot.
+A name in `only` the source lacks stays in the art as a hidden layer that can be posed, and is a
+problem as well.
 
 ### 4.5 Loose layers
 
@@ -575,26 +759,42 @@ const art = new StageArt({
 }, {pxPerUnit: 2});
 ```
 
-`pivot` is in pixels of the frame; `at` is where the pivot stands at rest, in artwork pixels of a
-canvas that has no picture — with `origin` `[0, 0]` by default. The box is the size of the first
-frame.
+The list is the stacking order, bottom first; `{store, id, layers}` takes a list as well, and the
+options `only` and `layers` are refused beside one. `pivot` is in pixels of the first frame as it
+was before the packer trimmed it, its middle without one; `at` is where the pivot stands at rest,
+in artwork pixels of a canvas that has no picture — with `origin` `[0, 0]` by default, and `[0, 0]`
+without an `at`. A layer without `frames` takes the frame of its name. Every frame lies where it
+lies in its untrimmed sprite, and the box of the layer is the union of its frames — the size of the
+first frame where they agree. A `pxPerUnit` of a layer sizes its frames; its `at` stays in the
+pixels of the art.
 
 ## 5. How it works
 
 ### 5.1 The mesh and the textures
 
-- One `FeatureSprites` per art, the only child of the art's `Group`, of a kind the art builds once
-  per set of `features`, its capacity the number of layers — the layers are known before the first
-  sprite is made, so the pool never grows. `transparent: true`, `depthWrite: false` by default:
-  art layers are drawn back to front (§5.2), and a caller can hand other material parameters.
+- One `FeatureSprites` per art, the only child of the art's `Group`, of a kind shared per list of
+  `features` (§3.7), its capacity the number of layers — the layers are known before the first
+  sprite is made, so the pool never grows. Where they are not known when the art is made — a
+  `{store, id}` or a promise source without `only` —, the mesh starts with an empty geometry, and
+  the load puts a geometry of as many slots as layers in its place, once. `transparent: true`,
+  `depthWrite: false` by default: art layers are drawn back to front (§5.2), and a caller can hand
+  other material parameters; those that are the art's own — the textures, the placement, the
+  capacity, the geometry, the passes — are refused.
 - One `colorMap`: the texture of the atlas item, or of the `DynamicAtlas` the files are packed into.
-  The art sizes that atlas from the trimmed boxes — the next power of two that holds them with
-  `padding: 2` and `extrude: 1`, up to the largest size `renderer.capabilities` allows, or 4096
-  before a renderer is known — and refuses a set that does not fit, naming the size and the way
-  out: two arts. Art that spans more than one texture is two `StageArt`s with a `renderOrder` each
+  The art sizes that atlas from the trimmed boxes of all files, through a dry run of the shelf
+  packing of `DynamicAtlas` (`packsInto()`) — the next power of two that holds them with
+  `padding: 2` and `extrude: 1`, up to the largest texture the device of the option `renderer`
+  allows, read once the renderer is initialised, since a `WebGPURenderer` has no
+  `capabilities.maxTextureSize`; 4096 without a renderer, or before its device is known. A set that
+  does not fit is one problem of the source, worded as a refusal — the size, and the way out: two
+  arts —, since a load that runs asynchronously cannot throw at the caller; every layer stays
+  hidden. Art that spans more than one texture is two `StageArt`s with a `renderOrder` each
   (`docs/sprites.md`, "Across meshes").
-- Each frame is prepared once (`prepareSpriteFrame()`), so a frame change is
-  `setPreparedFrame()` — nine numbers copied.
+- Each frame is prepared once, by `prepareLayerFrame()` (`artSources.ts`): the tex coords of the
+  picture — inset by an inner padding (§4.1) —, the diagonal flip of the atlas frame, and the
+  margins of the frame's box inside the box of the layer as fractions of it, never the margins of
+  the canvas that `prepareSpriteFrame()` would write. A frame change is `setPreparedFrame()` —
+  nine numbers copied.
 
 ### 5.2 Attributes and the stack
 
@@ -611,7 +811,10 @@ frame.
 
 `artOrder` is an attribute of an internal feature with no shader stage, read straight from the
 buffer by `sortBy()`. It holds `(order + 1024) · 8192 + index` — a whole number below 2²⁴, exact in
-a float32 —, so `order` runs from −1024 to 1023 and an art holds at most 8192 layers.
+a float32 —, so `order` runs from −1024 to 1023 and an art holds at most 8192 layers: `only` or a
+list of files that names more is refused, and a source that holds more is a problem of which the
+art takes the first 8192 (§3.8). The rotation and the fade are written straight into their buffers
+through `vertex-objects`, so a turn and a fade allocate nothing.
 
 The stack is sorted in two passes, both stable and both on attributes: `sortBy('artOrder')`, then
 `sortBy('z')` — the depth, the farthest (the lowest `z` of the art frame) first. The second pass
@@ -619,18 +822,20 @@ keeps the order of the first among layers of one depth, so the stack is total: t
 orders give the same stack whatever the history of the sort, and a scrubbed timeline shows the same
 picture for the same time. Back to front along the art frame's `z` is right for every camera in
 front of the plane, since all layers lie parallel to it. `update()` sorts only after an order or a
-depth changed, and a sort that finds the stack as it is moves nothing.
+depth changed, and a sort that finds the stack as it is moves nothing. The first `update()` that
+finds a layer painted above another lying behind it says so on the console, once per layer (§2.5).
 
 ### 5.3 Change detection
 
-The art keeps the pose of every layer as written last, in one `Float64Array` (ten numbers a layer)
-and a flag word. `set()` compares each field it is given with the stored one, writes the buffer
-only where it differs, and sets the changed flag only where the layer is shown or turns shown or
-hidden. `takeChanged()` answers the flag and clears it. Nothing is built per call.
+The art keeps the pose of every layer as written last, in one `Float64Array` (ten numbers a layer),
+the pose of its rest in another, and a byte of flags per layer. `set()` compares each field it is
+given with the stored one, writes the buffer only where it differs, and sets the changed flag only
+where the layer is shown or turns shown or hidden. `takeChanged()` answers the flag and clears it.
+Nothing is built per call.
 
 ### 5.4 The hot path
 
-`set()`, `apply()`, `takeChanged()`, `update()` without a sort and without a new `D`,
+`set()`, `apply()`, `takeChanged()`, `update()` without a sort, a turn and a new `D`,
 `ArtTrack#sample()`, `rampAt()`, `animationFrameAt()` and `layer.frameAt()` allocate nothing. The
 pose a caller hands in is read field by field; a literal `{x, y}` built per call is the caller's
 allocation, which the guide names, and `apply()` is the way around it. A `layer(name)` look-up is a
@@ -641,16 +846,36 @@ un-inlined (`AGENTS.md`, "Two test surfaces").
 
 ### 5.5 Loading
 
-A `{store, id}` source asks `store.getAsync(id, ['atlas', 'texture'])`; a source handed as a
-promise is awaited. Until then the mesh exists, empty of pictures, every layer hidden — the art can
-be added to the scene and posed at once. Phase C follows the store (`store.on()`) instead of asking
-it once, so a re-exported sheet reaches a running page (§10).
+A `{store, id}` source takes its first load through `store.acquireAsync(id, ['atlas', 'texture'])`,
+then follows the item with `store.on()` and lets the lease go once the subscription holds the item:
+one hold while the art lives, so `clearUnused()` leaves the item standing while an art draws it,
+and two arts on one item hold it once each. `dispose()` ends the following. A source handed as a
+promise is awaited; a files source is loaded by `loadLayerFiles.ts` (§4.2). Until then the mesh
+exists, empty of pictures, every layer hidden — the art can be added to the scene and posed at once,
+by the names it knows (§3.1).
+
+**A reload** (phase C of §10). A sheet parsed again under the id reaches the running art as a new
+atlas, read again with the options the art was made with. The layers stay those of the first load:
+
+- a layer the reload has gets its new frames, box, pivot, tags and rest — an override still beats
+  the file —, and keeps its handle, its sprite and every field the caller moved off its rest; a
+  field still at its rest takes the new rest; a `frame` beyond its new frames is a problem, and the
+  layer shows frame 0;
+- a layer the reload lacks stays in the art, posed and hidden, with a problem; a later reload that
+  brings it back shows it again at its pose;
+- a layer new in the reload stays out, with one problem that says a new `StageArt` takes it.
+
+`problems` is replaced by the list of each reload — a list read before stays as it was —, and a
+reload with problems says them once on the console. A new texture alone is swapped into the mesh,
+and `takeChanged()` answers `true` for it where a layer is shown. `loaded` has resolved with the
+first load and stays so.
 
 ### 5.6 The plane
 
 The art turns its mesh with `ProjectionPlane.get(plane).applyRotation(mesh)` after resetting the
-mesh's rotation, at construction and in the `update()` after `plane` or `projection` changed to
-another plane (`ProjectionPlane#equals()`); the group stays the caller's to move. The positions of
+mesh's rotation, at construction and in the `update()` that finds the plane in force unequal to a
+copy of the one the mesh faces (`ProjectionPlane#equals()`) — a swap of `plane` or `projection`,
+or a plane changed in place; the group stays the caller's to move. The positions of
 the layers are in the art frame and do not change with the plane, so a swap of the plane writes no
 sprite — only the quaternion of the mesh. `'xy|bottom-left'` turns nothing, and an art on it costs
 what it costs without the feature.
@@ -668,37 +893,54 @@ what it costs without the feature.
 - Under an `OrthographicProjection`, without a projection and with `compensateDepth: false`, `k` is
   1 and depth is the `z` of §2.1 alone.
 - The `focus` of §2.5 is a point of the art frame, worked out from the option once, as `origin` is.
-- The check of `δ > −D` runs in `set()` where `D` is known, and in the layout for the layers a new
-  `D` leaves behind the camera, which it hides through `visible` and lists for one warning each.
+- The check of `δ > −D` runs in `set()` and `apply()` where a `ParallaxProjection` gave a `D` —
+  under `compensateDepth: false` too —, against the `D` of the last `update()`, and in the layout for
+  the layers a new `D` leaves behind the camera, which it hides through `visible` and warns about
+  once each where the layer would be shown.
 
 ## 6. Module
 
 A module of its own, `src/stage-art/`, beside `text/` — which is the same kind of thing: a facade
-that writes into sprites of a kind. It imports `sprites`, `texture`, `utils`, and from `stage` the
-`ProjectionPlane` and the projection types it reads; nothing in `stage` depends on it.
+that writes into sprites of a kind. It imports `sprites`, `texture`, `utils`, `vertex-objects` — to
+write the rotation and the fade into their buffers without allocation (§5.2) —, and from `stage`
+`ProjectionPlane`, `IProjection` and `ParallaxProjection`; nothing outside `stage-art` imports it.
+`src/index.ts` re-exports it through `public-api.ts`, which names its exports one by one.
 `animationFrameAt()` and `AnimationTiming` go into `texture/`, next to `FrameBasedAnimations`, since
-any sprite animated on the CPU needs them; the getter of §3.9 goes into `ParallaxProjection`.
+any sprite animated on the CPU needs them; the getter of §3.9 goes into `ParallaxProjection`;
+`AsepriteJson.ts` keeps the `meta` of an atlas for the internal `asepriteMetaOf()` (§2.6); and
+`DynamicAtlas` shares its shelf packing with a dry run, `packsInto()`, which sizes the atlas of a
+files source (§5.1).
 
 ```text
 src/stage-art/
-  StageArt.ts            the class, the handles, set/apply/takeChanged/update
-  stageArtKind.ts        the kind and the internal order feature
-  artLayout.ts           the mapping of §2.1, the plane of §5.6, the depth of §5.7
-  artSources.ts          reading the four sources into layers (§4)
-  trimLayerImage.ts      the alpha box of a decoded file (phase B)
+  StageArt.ts            the class: poses, change detection, the stack, update(), loading and following a store item
+  ArtLayer.ts            the handle of a layer
+  artPose.ts             the fields of a pose, their slots in the pose buffer and their checks
+  artOptions.ts          the options and the shapes of a source, and what new StageArt() refuses of them
+  stageArtKind.ts        the kind and the internal order feature; a kind per list of features (§3.7)
+  artLayout.ts           the mapping of §2.1, the turn into the plane of §5.6, the depth of §5.7
+  artSources.ts          reading the sources into layers (§4), the frames prepared for the mesh (§5.1)
+  loadLayerFiles.ts      fetching, decoding, trimming and packing the files of §4.2
+  trimLayerImage.ts      the alpha box of a decoded file
   artTrack.ts            artTrack(), rampAt()
   public-api.ts
+  fixtures/              a real Aseprite export and a free-tex-packer export of one scene, their
+                         generators (kitchen.lua and export.mjs, generate.mjs) and the facts of both
 ```
 
 ## 7. Ownership and dispose
 
 Following [the resource lifecycle rules](../resource-lifecycle.md): the art owns its mesh — the
 geometry and material the mesh builds — and the `DynamicAtlas` it packs files into, with its
-texture. A store, an atlas, a texture, a projection and a plane handed in stay the caller's; the
-art holds the store's texture as long as it lives and lets go of it on `dispose()`. After
-`dispose()` the art has left its parent, `set()`, `apply()`, `reset()` and `update()` do nothing,
-`takeChanged()` answers `false`, `layer()` throws, `layerOf()` answers `undefined`, and a load
-still in flight is dropped when it lands — its bitmap closed.
+texture. A store, an atlas, a texture, a renderer, a projection and a plane handed in stay the
+caller's; the art holds the store item as long as it lives (§5.5) and lets go of it on `dispose()`.
+After `dispose()` the art has left its parent, `set()`, `apply()`, `reset()` and `update()` write
+nothing — `set()` and `apply()` still refuse what they cannot use, as a mutating method of the
+library does after `dispose()` (`resource-lifecycle.md`, "After `dispose()`") —, `takeChanged()`
+answers `false`, `layer()` throws, `layerOf()` answers `undefined`, the getters answer what they
+held, `loaded` resolves, and a load still in flight is dropped when it lands: the requests of layer
+files are aborted, and every decoded picture is closed, at once or the moment it lands. A second
+`dispose()` does nothing.
 
 ## 8. Refusals
 
@@ -706,18 +948,28 @@ All under the subject `StageArt` (or `StageArt "<name>"`), `new StageArt()`, `Ar
 `artTrack`, through `describeValue()`; a projection or a plane of the wrong kind through
 `describeThreeValue()` where it is a three.js object:
 
-- a source that is none of the four shapes, options that are no object, a `pxPerUnit` that is no
-  finite number above 0, an `origin` or a `focus` that is no pair of finite numbers, a
-  `compensateDepth` that is no boolean;
+- a source that is none of the shapes of §3.2, options that are no object or have a key no option
+  has, a `name` that is no string, a `pxPerUnit` that is no finite number above 0, an `origin` or a
+  `focus` that is no pair of finite numbers, a `compensateDepth` that is no boolean;
 - a `projection` that is no `IProjection`, a `plane` that is neither a `ProjectionPlane` nor one of
   its four descriptions — also through the setters, which keep what they held;
-- `only` naming a layer twice; `layers` that is no object; a `depth` override that is no finite
-  number;
-- a `features` entry `defineSprite()` refuses, in its words;
-- `layer()` and `set()` with a name the art does not know — the message lists the names;
+- `only` naming a layer twice or more than 8192 layers, a list of files naming more than 8192;
+  `layers` that is no object; options of a layer that are no object, have a key no option has, or
+  a value they cannot take — a `depth` that is no finite number, a `rest` field as `set()` refuses
+  it —, and `at` or `pxPerUnit` beside an atlas; `only` or `layers` beside loose layers; loose
+  layers that are no list, unnamed or named twice;
+- a `features` entry that is no feature or takes a slot the art fills, in the words of
+  `defineSprite()`; a `material` that sets what is the art's own; a `renderer` that is no renderer;
+- `layer()` and `set()` with a name the art does not know — the message lists the names, or says
+  that the source is still loading;
 - the fields of a pose as in §3.3;
-- the keys of a track as in §3.4; `rampAt()` with a `duration` that is no finite number above 0;
-- `animationFrameAt()` with a timing whose `frameCount` is no whole number of 1 or more.
+- the keys of a track as in §3.4, and a time that is no finite number in `sample()` and
+  `isMoving()`; `rampAt()` with a `seconds` or a `start` that is no finite number, or a `duration`
+  that is no finite number above 0;
+- `layer.frameAt()` with a tag the layer does not have — the message lists its tags —, and before
+  the load;
+- `animationFrameAt()` with a timing whose `frameCount` is no whole number of 1 or more, or a
+  `seconds` that is no finite number.
 
 What the art cannot load or read out of a file is no refusal: it is a problem (§3.8).
 
@@ -729,15 +981,16 @@ that holds at `maxPixelZoom` 2 at most, away from classic fantasy.
 
 | demo | page | shows |
 | --- | --- | --- |
-| *stage art: the listening machine* | `stage-art-machine.astro` | a brass contraption that listens to the fog — a lever, a flywheel, a needle on a dial, a punched strip, a lamp and steam — rendered in Blender, one render per part, packed into a trimmed atlas (§4.3). Four tracks: the lever (`'once'`, started by a click), the needle (`'pingpong'`), the flywheel (`'loop'`), the lamp through `rampAt()`; the steam through `animationFrameAt()`. A scrubber over the timeline shows that poses are functions of time — drag it back and the machine runs backwards, the steam included; a panel counts `frames` and `draws` of the `FramePacer` the art answers to, and a toggle draws the pivots |
-| *stage art: one Aseprite file* | `stage-art-aseprite.astro` | a night-shift vending machine with odd goods, painted in Aseprite with layers, a pivot slice per moving part and a tag for each loop. The page has no layer list: a panel shows what the art read out of the sheet — names, order, boxes, pivots, tags (§4.1). A click picks a layer (`SpritePicker`, `layerOf()`) and starts a wobble track at the time of the click; a second click overtakes the first and the track starts from where the layer stands. `Flash` through `features` lights the layer under the pointer. A toggle switches the stage between `'xy|bottom-left'` and `'xy|top-left'` (§2.2): the picture, the turns and the picks stay the same |
-| *stage art: the drowned platform* | `stage-art-depth.astro` | a flooded underground platform at night, painted in planes — the tunnel mouth far back, the pillars, the platform edge, a figure waiting, cables hanging in the foreground — each Aseprite group a plane with its `depth` in the user data (§4.1, §2.5). At rest the picture is the painting; the pointer moves the camera a little through a `CameraRig` (`look()` and a small `moveTo()`), and the planes part. A train's light sweeps the tunnel on a track that dollies a layer through `depth`; ripples on the water through `animationFrameAt()`. Toggles: compensation off (the far planes shrink to the middle), `OrthographicProjection` (the parallax is gone, the stack stays), and a slider for `distanceToProjectionPlane` that shows the layout follow `D` without a jump at rest |
-| *stage art: layer files* | `stage-art-layer-files.astro` | a shelf of specimen jars exported as full-canvas PNGs, one per layer, with pivot marker layers and the back wall at `@depth` in its file name (§4.2). A *slow load* toggle holds each file back for a moment in the demo's own loader, so the layers appear one by one with nothing flashing up; a *break a file* toggle swaps one url for a missing one: the jar stays away, `problems` lists it, the shelf goes on swaying — phase B |
+| *stage art: the listening machine* | `stage-art-machine.astro` | a brass contraption on a foggy pier that listens to the fog through two horns — a lever, a flywheel, a needle on a dial, a punched paper strip, a lamp and steam —, rendered in Blender one part at a time through one camera and packed into a trimmed atlas in free-tex-packer's layout (§4.3); `only` names the stack — the strip hangs behind the cabinet —, the flywheel, the needle and the lever turn about `.pivot` marker frames, and the pivot of the strip is given in code. Five motions on one timeline: the lever (`'once'`, from the time of a click), the paper strip and the lamp following it, the lamp warming through `rampAt()`, the needle (`'pingpong'`), the flywheel (`'loop'`); the steam steps through its twelve frames by `animationFrameAt()`. A scrubber over the timeline shows that poses are functions of time — drag it back and the machine runs backwards, the steam included; a panel counts the frames the `FramePacer` asked about and the frames it drew, and a toggle draws the pivots |
+| *stage art: one Aseprite file* | `stage-art-aseprite.astro` | a night-shift vending machine with odd goods, a cat beside it and a moth at its sign, pixel art in one Aseprite file of 26 layers in groups, a pivot slice per moving part and a tag per loop — painted by code and built into the `.aseprite` file through Aseprite's Lua API, then exported through the Aseprite CLI as §4.1 says. The page has no layer list: a panel shows what the art read out of the sheet — names, order, boxes, pivots, depths, tags (§4.1); a tag named like a layer is its loop, stepped by `layer.frameAt()`. `Flash` through `features` lights the layer under the pointer; a click picks a layer (`SpritePicker`, `layerOf()`) and, where it has a pivot slice, starts a wobble track about its pivot at the time of the click — a layer without one only lights —; a second click overtakes the first and the track starts from where the layer stands. A toggle switches the stage between `'xy|bottom-left'` and `'xy|top-left'` (§2.2): the picture, the turns and the picks stay the same |
+| *stage art: the drowned platform* | `stage-art-depth.astro` | a flooded underground platform at night — the tunnel mouth far back, the pillars, the platform edge, a figure waiting, cables hanging in the foreground —, rendered in Blender plane by plane through one camera and laid out in one Aseprite file through its Lua API, each group a plane with its `depth` in the user data (§4.1, §2.5), exported through the Aseprite CLI. At rest the picture is the painting; the pointer moves the camera a little through a `CameraRig` (`look()` and a small `moveTo()`), and the planes part. A train's light comes down the tunnel on a track that dollies its layer through `depth`; ripples on the water step through a tag by `layer.frameAt()`. Toggles: compensation off — a second art with `compensateDepth: false` on the same store item, swapped in once loaded (the far planes shrink to the middle) —, `OrthographicProjection` (the parallax is gone, the stack stays), and a slider for `distanceToProjectionPlane` that shows the layout follow `D` without a jump at rest |
+| *stage art: layer files* | `stage-art-layer-files.astro` | a shelf of specimen jars aboard a research vessel, rendered in Blender one layer at a time on the full canvas, 24 PNGs, with pivot marker layers (`coral.pivot.png`), the bulkhead at `@depth` in its file name (`wall@240.png`) and the dust in the light of the porthole as `motes.png`, `motes-1.png` … `motes-7.png` — `-N` names, since a `#` would not reach the file through the dev server (§4.2). The jars rock with the roll of the ship on a track each; the dust steps through its frames by `animationFrameAt()`. A *slow load* toggle holds the responses of the files back for a moment in a `fetch()` of the page's own, and the panel follows every request: the files trickle in, the canvas stays empty with nothing flashing up, and the shelf appears whole once the last file has settled; a *break a file* toggle swaps one url for a missing one: the jar stays away, `problems` lists it with its url, the shelf goes on rolling |
 
-Each page gets its `_<name>.json` with the tags of the exports it uses (`StageArt`, `artTrack`,
-`rampAt`, `animationFrameAt`, `ParallaxProjection`, `OrthographicProjection`, `ProjectionPlane`,
-`CameraRig`, `FramePacer`, `SpritePicker`, `DynamicAtlas`, `TextureStore`), and its preview image.
-A demo for phase C — a sheet that reloads while the page runs — is left to the build of that phase.
+Each page has its `_<name>.json` with the tags of the exports it uses — among them `StageArt`,
+`artTrack`, `rampAt`, `animationFrameAt`, `ParallaxProjection`, `OrthographicProjection`,
+`CameraRig`, `FramePacer`, `SpritePicker`, `Flash`, `TextureStore` — and its preview image; the
+generators of the art are documented in `apps/lookbook/assets-src/README.md`. A reload while the
+page runs (phase C) has no demo; the guide shows it ("Reloading a sheet while the page runs").
 
 ## 10. Phases
 
@@ -745,7 +998,9 @@ A demo for phase C — a sheet that reloads while the page runs — is left to t
 | --- | --- | --- |
 | A | `animationFrameAt()`; `artTrack()`, `rampAt()`; `ParallaxProjection#distanceToProjectionPlane`; `StageArt` on an atlas source — Aseprite with split layers (§4.1), a trimmed atlas (§4.3), loose layers (§4.5) — with poses, overrides, every plane (§5.6), depth and its compensation (§5.7), the stack, `takeChanged()`, `layerOf()`, `features`, hidden until loaded and `problems` for the layers of an atlas | the listening machine, one Aseprite file, the drowned platform |
 | B | the files source (§4.2): decoding, trimming, the `DynamicAtlas`, pivot markers, depths in file names, a problem per file | layer files |
-| C | following the store, so a re-exported sheet replaces the frames of a running art; a layer keeps its pose and its name | — |
+| C | following the store, so a re-exported sheet replaces the frames of a running art; a layer keeps its pose and its name (§5.5) | — |
+
+All three phases are built.
 
 ## 11. Tests
 
@@ -754,31 +1009,53 @@ A demo for phase C — a sheet that reloads while the page runs — is left to t
 - `src/texture/animationFrameAt.spec.ts` — every playback, with one duration and with durations,
   at the edges of each frame, before 0 and far past the end; frame by frame against the arithmetic
   of the shader of `AnimatedFrames`, written out in JavaScript in the spec.
-- `src/stage-art/artTrack.spec.ts` — before, between and after the keys; a cut; the ease per key
-  and per track; held fields; discrete fields; `'loop'` and `'pingpong'`; fields the track leaves
-  alone; `isMoving()`; every refusal; `rampAt()`.
-- `src/stage-art/artLayout.spec.ts` — the mapping of §2.1 (a pivot at the canvas middle lands on
-  the origin; 90° clockwise is −π/2); the turn of the mesh for each of the four planes, checked by
-  where a point of the art frame lands in the world; the compensation: a layer at depth δ, projected
-  through the rest camera of a `ParallaxProjection`, covers the box it covers at depth 0, for δ
-  behind and in front of the plane and a focus off the origin; `k = 1` under an
-  `OrthographicProjection` and with `compensateDepth: false`; a new `D` lays the layers out anew.
-- `src/stage-art/StageArt.spec.ts` — partial `set()`, `reset()`, `apply()`; `takeChanged()` true
-  only for a visible change — the same value twice, a hidden layer that moves and a frame index
-  that stays answer `false`, a new `D` answers `true` —; the stack by depth, then order, total under
-  any history; a layer behind the camera hidden and warned once; hidden until loaded; `problems` for
-  a missing layer, an unknown override, a depth that is no number and a source that fails;
-  `layerOf()`; the `projection` and `plane` setters; `dispose()`.
-- `src/stage-art/artSources.spec.ts` — the reading of §4.1, §4.3 and §4.5 from json fixtures of a
-  real Aseprite split-layer export (with groups and user data) and a free-tex-packer export,
-  committed beside the spec.
+- `src/texture/hot-path-allocations.spec.ts` — `animationFrameAt()` allocates nothing, beside its
+  module.
+- `src/texture/AsepriteJson.spec.ts` — `asepriteMetaOf()` answers the `meta` of the json for the
+  atlas `parse()` builds, for the store's `'aseprite'` adapter, for a target atlas, and for the
+  split-layer fixture with its groups and user data.
+- `src/texture/DynamicAtlas.spec.ts` — `packsInto()` answers what `add()` of the same sizes into a
+  fresh atlas would.
 - `src/stage/ParallaxProjection.spec.ts` — the getter: `NaN` before the first view, the distance of
   the specs, the default where the specs name none or one no camera can be built from.
-- `src/stage-art/trimLayerImage.spec.ts` (phase B) — the alpha box of a bitmap, an empty one, one
-  of another size; depths in file names.
-- `src/stage-art/hot-path-allocations.stage-art.spec.ts` — `set()`, `apply()`, `takeChanged()`,
-  `update()` without a sort and without a new `D`, `sample()`, `animationFrameAt()`,
-  `layer.frameAt()` allocate nothing; `set()` of a depth layer under a `ParallaxProjection` too.
+- `src/stage-art/artTrack.spec.ts` — before, between and after the keys; a cut; the ease per key
+  and per track; held fields; discrete fields; `'loop'` and `'pingpong'`; a track of one key or of
+  duration 0; fields the track leaves alone; `isMoving()`; every refusal, a field a later key sets
+  and the first leaves out and a time that is no finite number among them; `rampAt()`.
+- `src/stage-art/artLayout.spec.ts` — the mapping of §2.1 (`artFrameOf()`, `layoutLayerInto()`,
+  `anchorOf()`: a pivot at the canvas middle lands on the origin; 90° clockwise is −π/2); the turn
+  of the mesh for each of the four planes, checked by where a point of the art frame lands in the
+  world; the compensation: a layer at depth δ, projected through the rest camera of a
+  `ParallaxProjection`, covers the box it covers at depth 0, for δ behind and in front of the plane
+  and a focus off the origin.
+- `src/stage-art/artSources.spec.ts` — the reading of §4.1 from the fixtures of a real Aseprite
+  split-layer export, with and without `--ignore-empty` (groups, user data, a slice, a tag, cels
+  that differ in size, an empty cel); of §4.3 from the free-tex-packer fixture; the names of §4.2
+  (`parseLayerFileName()`, `frameNameOfFile()`) and the reading of a list of files
+  (`readLayerFiles()`); the overrides and `only`; what `checkArtSourceOptions()` refuses; loose
+  layers (§4.5); `prepareLayerFrame()`, the trim inside the box of the layer and a frame grown by
+  an inner padding, evenly or not.
+- `src/stage-art/StageArt.spec.ts` — `new StageArt()` and every refusal of it; poses: partial
+  `set()`, `reset()`, `rest`, `apply()`, `frameAt()`, an empty cel as the frame, `layerOf()` through
+  a sort; `features`, typed and shared; `takeChanged()` true only for a visible change; the stack by
+  depth, then order, then as painted, total under any history, and the warning of a layer painted
+  above another lying behind it; loading — hidden until loaded, a promise source without `only`, a
+  source that fails, a frame set before the load beyond the frames, a name of `only` the source
+  lacks, the leases of a store item, two arts on one item —; following a store item through
+  reloads; `dispose()`; planes, projections and depth — the compensation, a new `D`, the limit
+  in front of the camera under `compensateDepth: true` and `false`, the setters —; a files source —
+  the names at once, one request per file with `%23`, the packing, the limit of `renderer`, a file
+  that fails or lies on another canvas, `dispose()` during the load.
+- `src/stage-art/stageArtKind.spec.ts` — a kind per list of feature objects, and none kept beyond
+  the life of its features.
+- `src/stage-art/trimLayerImage.spec.ts` — the alpha box of a bitmap, an empty one, a picture over
+  the whole canvas and one in a corner.
+- `src/stage-art/hot-path-allocations.stage-art.spec.ts` — `sample()` of an eased track, `rampAt()`,
+  the layout of a layer, `set()`, `apply()` and `takeChanged()`, `update()` without a sort and
+  `layer.frameAt()`, and `set()` of a depth layer under a `ParallaxProjection` with an `update()` at
+  the same distance allocate nothing.
+- `apps/lookbook/src/demos/stage-art-layer-files/heldBackFetch.spec.ts` — the `fetch()` that holds
+  the responses of the files demo back (§9).
 
 ### 11.2 Browser (`packages/twopoint5d-testing/test/stage-art.test.js`)
 
@@ -792,20 +1069,26 @@ Under WebGPU and WebGL 2:
   same scene with every depth 0, within one pixel at the edges; with the camera moved sideways the
   far layer has moved less on the screen than the near one;
 - a layer whose picture is held back draws nothing — no pixel of the clear colour changes — until
-  it arrives.
+  it arrives;
+- a `SpritePicker` answers the layer behind through the transparent part of a front layer, and
+  never a hidden one (§3.7);
+- full-canvas PNG files, made in the test, are drawn where the files put them, and a layer turns
+  about the dot of its pivot marker (§4.2).
 
 ## 12. Docs and CHANGELOG
 
 - A guide of its own, `packages/twopoint5d/docs/stage-art.md`, written user first: the scenarios
   — a scene out of Aseprite, out of layer PNGs, out of a packed atlas, loose props; moving a layer;
   a timeline with a scrubber; a strip of steam; a painted scene made deep; art on a `top-left`
-  stage; drawing on demand; a click on a layer; the circle of a pestle as a recipe — then a cheat
-  sheet of the options and the fields of a pose, then the reference. Figures under
-  `docs/images/stage-art/`: the mapping of §2.1, and the compensation of §2.5 seen from the side.
+  stage; drawing on demand; a click on a layer; the circle of a pestle as a recipe; reloading a
+  sheet while the page runs — then a cheat sheet of the sources, the options and the fields of a
+  pose, then the reference. Figures under `docs/images/stage-art/`: the mapping of §2.1, and the
+  compensation of §2.5 seen from the side.
 - `docs/stages.md`, "Depth under a parallax projection": the getter of §3.9, and a pointer to the
   guide for painted scenes with depth.
 - `docs/sprites.md`, "Animated frames": `animationFrameAt()` for a sprite animated on the CPU.
-- `docs/display.md`, "Drawing on demand": `art.takeChanged()` as a frame step.
+- `docs/display.md`, "Painted layers that move" in "Drawing on demand": `art.takeChanged()` as a
+  frame step.
 - `drawing-on-demand.md` §3.2: `StageArt` as the second block that answers a `Motion`.
 - `AGENTS.md` and `docs/architecture.md`: the module and its guide.
 - `CHANGELOG.md`, `## [Unreleased]`, "Added": `StageArt` and its types, `artTrack()`, `rampAt()`,
@@ -825,3 +1108,29 @@ Under WebGPU and WebGL 2:
 - PSD and Krita files read directly. Their formats change, and every one of them exports PNGs.
 - Mesh deformation of a layer (bones, a bending tail). A `gridBase()` kind of one's own, outside
   the art.
+
+## 14. Open after the build
+
+None of it is scheduled; each item would be decided, and the guide grown with it, before it is
+built.
+
+- **The pose a layer shows now.** `ArtLayer` answers its `rest`, not the pose last written; a caller
+  that needs it back — the Aseprite demo, to start a wobble from where a layer stands — works it out
+  again from the track it ran. A getter that copies the pose into a target the caller hands in
+  would cost no allocation (§5.3).
+- **`compensateDepth` as a setter.** It is an option of the constructor alone; the depth demo builds
+  a second art on the same store item to toggle it (§9).
+- **A read-out of the tags.** `layer.tags` answers the names of the tags; their frame ranges,
+  directions and durations stay inside the art, so a panel cannot show them (§3.1, §4.1).
+- **Loose layers out of files.** The table of §4 names an atlas for loose props; a `layers` list
+  beside `files` — props as single PNGs, each trimmed and packed — is not built (§3.2, §4.5).
+- **The painted-order warning for loose layers.** The warning of §2.5 compares the order of the list
+  with the depths, as it does for a painted canvas; for loose layers, which were never painted
+  together, it may say nothing useful — the example of §4.5, a `steam` at a depth of 40 listed
+  above a `carafe5` on the plane, sets it off. Whether it should stay quiet there is open.
+- **File names with `%` or `?`.** A files source writes a `#` in a file name as `%23`; a `%` or a
+  `?` goes out as it is, and the server reads an escape or a query out of it (§4.2).
+- **The tooling of the lookbook.** The asset build empties the folder of a demo before its
+  generator runs, so a run without Aseprite or Blender leaves the folder empty until git restores
+  it; and the Blender of the generators is the one on the `PATH`, else `/usr/bin/blender`, with no
+  environment variable beside `ASEPRITE` to name another.

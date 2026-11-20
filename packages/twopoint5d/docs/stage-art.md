@@ -1028,6 +1028,7 @@ list in the place of `problems` and says it once on the console:
 | a depth in the file that is no number | the layer on the plane |
 | two depths in the frame names of one layer | the first taken |
 | frames of one layer on canvases of different sizes | the problem said, the frames placed as they are |
+| a frame larger in the atlas than its `spriteSourceSize`, but not by one whole number of texels on every side — an export with `--inner-padding` gone wrong | the frame drawn shrunk; export without `--inner-padding`, or with a padding of whole texels |
 | a packed layer of numbered frames and named ones | the numbered ones taken |
 | a pivot slice or a `.pivot` marker that names no layer | the marker unused |
 | a tag that runs past the frames of the sprite or steps through a frame no layer has a picture of | the tag left out |
