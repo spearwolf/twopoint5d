@@ -315,6 +315,21 @@ describe('readAtlasSource() of a trimmed atlas', () => {
     expect(layerOf(layers, 'ladle').frames.map((frame) => frame?.frame)).toEqual([atlas.frame('ladle')]);
   });
 
+  test('a -suffix frame is a frame of its layer wherever the packer wrote it, before the frame of the layer too', () => {
+    const [atlas] = TexturePackerJson.parse({
+      frames: {
+        'tree-shadow': {frame: {x: 0, y: 0, w: 4, h: 4}},
+        tree: {frame: {x: 4, y: 0, w: 4, h: 4}},
+      },
+      meta: {image: 'x.png', size: {w: 8, h: 4}},
+    });
+    const {layers, problems} = readAtlasSource(SUBJECT, atlas, {});
+
+    expect(layers.map(({name}) => name)).toEqual(['tree']);
+    expect(layers[0]!.frames.map((frame) => frame?.frame)).toEqual([atlas.frame('tree'), atlas.frame('tree-shadow')]);
+    expect(problems).toEqual([]);
+  });
+
   test('a .pivot marker is not drawn: the middle of its box is the pivot of its layer', () => {
     const {layers} = readAtlasSource(SUBJECT, ftpAtlas(), {});
 
@@ -500,6 +515,35 @@ describe('readLayerFiles()', () => {
       {x: 101, y: 84, w: 18, h: 38},
     ]);
     expect(carafe5.box).toEqual({x: 100, y: 80, w: 20, h: 42});
+  });
+
+  test('a -suffix file listed after the file of its layer is a further frame of it: the base frame 0, the suffixed ones in the order of the list', () => {
+    const files = ['tree.png', 'tree-b.png', 'tree-a.png'];
+    const results: LayerFileResult[] = files.map((file, index) => ({
+      url: `${URL_BASE}${file}`,
+      box: {x: index, y: 0, w: 2, h: 2},
+      frame: packedFrame(`after-${file}`),
+    }));
+    const {layers, problems} = readLayerFiles(SUBJECT, files, results, {width: 8, height: 8});
+
+    expect(layers.map(({name}) => name)).toEqual(['tree']);
+    expect(boxesOf(layers[0]!).map((box) => box?.x)).toEqual([0, 1, 2]);
+    expect(problems).toEqual([]);
+  });
+
+  test('a -suffix file listed before the file of its layer is a layer of its own, in its place in the stack', () => {
+    const files = ['tree-shadow.png', 'tree.png'];
+    const results: LayerFileResult[] = files.map((file, index) => ({
+      url: `${URL_BASE}${file}`,
+      box: {x: index, y: 0, w: 2, h: 2},
+      frame: packedFrame(`before-${file}`),
+    }));
+    const {layers, problems} = readLayerFiles(SUBJECT, files, results, {width: 8, height: 8});
+
+    expect(layers.map(({name}) => name)).toEqual(['tree-shadow', 'tree']);
+    expect(boxesOf(layerOf(layers, 'tree-shadow')).map((box) => box?.x)).toEqual([0]);
+    expect(boxesOf(layerOf(layers, 'tree')).map((box) => box?.x)).toEqual([1]);
+    expect(problems).toEqual([]);
   });
 
   test('a numbered strip steam#0 … steam#3 is the frames of steam, by their numbers', () => {

@@ -391,6 +391,11 @@ interface NamedFrames {
   readonly names: readonly string[];
   /** What a message calls the source of the frames: `the atlas`, `the list of files`. */
   readonly what: string;
+  /**
+   * Whether a frame `<layer>-<suffix>` joins its layer only where it stands after the frame `<layer>`:
+   * a list of files keeps the order of the paint file, a packer writes its frames in an order of its own.
+   */
+  readonly suffixFollowsBase: boolean;
   has(name: string): boolean;
   /** The names a `frames` option picks: a list as it is, a `RegExp` over the names in their natural order. */
   pick(frames: readonly string[] | RegExp): string[];
@@ -404,6 +409,7 @@ function atlasFrames(atlas: TextureAtlas<unknown>): NamedFrames {
   return {
     names: atlas.frameNames().filter((name): name is string => typeof name === 'string'),
     what: 'the atlas',
+    suffixFollowsBase: false,
     has: (name) => atlas.frame(name) !== undefined,
     pick: (frames) => frameNamesOf(atlas, frames),
     frameOf: (name) => canvasFrameOf(atlas, name),
@@ -808,16 +814,22 @@ function readNamedFrames(source: NamedFrames, options: ArtSourceOptions, problem
     plain.push(frameName);
   }
 
-  // a plain name `<layer>-<suffix>` is a frame of the longest layer before a hyphen; shorter names are
-  // decided first, so the layers before a hyphen are known when a name is
+  // a plain name `<layer>-<suffix>` is a frame of the longest layer before a hyphen — in a source that
+  // keeps the order of the paint file, only where the frame `<layer>` stands before it; shorter names
+  // are decided first, so the layers before a hyphen are known when a name is
   const plainNameOf = (frameName: string) => parsedOf.get(frameName)!.name;
   const sorted = [...plain].sort((a, b) => plainNameOf(a).length - plainNameOf(b).length);
   const suffixOf = new Map<string, string>();
+  const joins = (layer: NamedLayer | undefined, frameName: string): boolean => {
+    if (layer === undefined || layer.override !== undefined) return false;
+    if (!source.suffixFollowsBase) return true;
+    return layer.base !== undefined && positionOf.get(layer.base)! < positionOf.get(frameName)!;
+  };
   for (const frameName of sorted) {
     const name = plainNameOf(frameName);
     for (let hyphen = name.lastIndexOf('-'); hyphen > 0; hyphen = name.lastIndexOf('-', hyphen - 1)) {
       const prefix = name.slice(0, hyphen);
-      if (layers.has(prefix) && layers.get(prefix)!.override === undefined) {
+      if (joins(layers.get(prefix), frameName)) {
         suffixOf.set(frameName, prefix);
         break;
       }
@@ -960,7 +972,8 @@ export type LayerFileResult =
 /**
  * Reads the layers of a files source (§4.2): the order of `files` is the stacking order, bottom
  * first; each file is a layer or a frame of one by its name without the extension, read after
- * {@link parseLayerFileName}; a pivot marker is not drawn, the middle of its box is the pivot of its
+ * {@link parseLayerFileName} — a file `<layer>-<suffix>` is a frame of `<layer>` only where it stands
+ * after the file of the layer, else a layer of its own; a pivot marker is not drawn, the middle of its box is the pivot of its
  * layer. `results` holds what the load made of each file, in the order of `files`, and before the
  * load is `undefined`: the list alone names the layers then. A file that failed is a problem of its
  * layer with its url, in the order of the list, and so is a layer whose files hold no pixel; the
@@ -994,6 +1007,7 @@ export function readLayerFiles(
   const source: NamedFrames = {
     names,
     what: 'the list of files',
+    suffixFollowsBase: true,
     has: (name) => fileOf.has(name),
     pick: (frames) => {
       if (!(frames instanceof RegExp)) return [...frames];

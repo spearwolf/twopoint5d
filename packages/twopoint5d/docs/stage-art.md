@@ -127,8 +127,8 @@ is named after its file without the extension, and the rest of the name says wha
 | file | is |
 | --- | --- |
 | `table.png`, `carafe5.png` | a layer of that name |
-| `carafe5-empty.png` | another frame of `carafe5`; frames follow in the order of the list |
-| `steam#0.png` … `steam#7.png` | the frames of `steam`, by number |
+| `carafe5-empty.png` | another frame of `carafe5`, listed after `carafe5.png`: the file of the layer is frame 0, its `-suffix` files follow in the order of the list. Listed before it, `carafe5-empty.png` is a layer of its own |
+| `steam#0.png` … `steam#7.png` | the frames of `steam`, by number. The `#` goes out as `%23`, which not every server maps back — the Vite dev server answers 404 —: name such a strip `steam.png`, `steam-1.png` … `steam-7.png` in this order, or serve it from a server that decodes `%23` |
 | `window@600.png`, `wall@-40.png` | the layer `window` at a depth of 600, `wall` 40 in front of the plane |
 | `carafe5.pivot.png` | no picture: one dot on a layer of its own, exported with the others — the middle of the dot is the pivot of `carafe5` |
 
@@ -143,8 +143,9 @@ filtering, up to the largest texture the device of `renderer` allows; without a 
 goes up to 4096 × 4096. The canvas is the size of the files. The layers know their names at once,
 from the list, and show their pictures once every file has arrived or failed.
 
-A file that does not load, is no image or has a size other than the first file that loaded hides its
-layer and goes into `art.problems` with its `url`; the rest of the scene goes on. Pictures that do
+A file that does not load, is no image or has a size other than the first file that loaded leaves
+its layer without that picture — a layer of that file alone stays hidden, one of more frames shows
+the others — and goes into `art.problems` with its `url`; the rest of the scene goes on. Pictures that do
 not fit into the largest atlas allowed are one problem of the source that names the size: split the
 files between two arts, each with a `renderOrder` of its own (`docs/sprites.md`, "Across meshes").
 `only` and `layers` work on the layers of the files as on those of an atlas, and a `frames` override
@@ -830,16 +831,18 @@ its anchor in its box, so a turn and a scale act about it.
 | `{store, id}` | loads the atlas and the texture of the item through `store.acquireAsync(id, ['atlas', 'texture'])`, then follows the item with `store.on()` until it is disposed: a sheet parsed again under the id reaches the running art ([reloading a sheet](#reloading-a-sheet-while-the-page-runs)), and `clearUnused()` leaves the item standing while an art draws it. Two arts on one item hold it once each |
 | `{atlas, texture}` | reads the atlas at once; both stay yours |
 | either with `layers: [...]` | reads loose layers: each `{name, frames?, pivot?, at?, depth?, order?, rest?, pxPerUnit?}` |
-| `{files, baseUrl?}` | fetches each file under `baseUrl` — a `#` in its name sent as `%23` —, trims it and packs it into a `DynamicAtlas` of its own, with padding 2 and extrude 1, which it owns and disposes |
+| `{files, baseUrl?}` | fetches each file under `baseUrl` — a `#` in its name sent as `%23`, which a server has to decode: the Vite dev server answers such a name with 404, so name a strip `steam.png`, `steam-1.png`, … there —, trims it and packs it into a `DynamicAtlas` of its own, with padding 2 and extrude 1, which it owns and disposes |
 | a promise of one | waits for it; a promise that rejects is a problem of the source |
 
 An atlas that `AsepriteJson.parse()` filled — the store's `'aseprite'` adapter calls it — is read as
 an Aseprite sheet, after [the rules of its scenario](#a-scene-out-of-an-aseprite-file); any other as
 a trimmed atlas named after [the rules of a packed atlas](#a-scene-out-of-a-packed-atlas). The
 canvas is the `sourceSize` of the frames; the box of a frame is its `spriteSourceSize`. In a packed
-atlas a name `<layer>-<suffix>` is a frame of the longest layer name before a hyphen, and a layer
-whose frames are numbered takes the numbered ones alone. A list of files is read by [the rules of
-layer PNGs](#a-scene-out-of-layer-pngs): the same names, in the order of the list; the canvas is
+atlas a name `<layer>-<suffix>` is a frame of the longest layer name before a hyphen, wherever the
+packer wrote it — the order of a packed atlas is the packer's —, and a layer whose frames are
+numbered takes the numbered ones alone. A list of files is read by [the rules of layer
+PNGs](#a-scene-out-of-layer-pngs): the same names, in the order of the list, and a `-suffix` file
+is a frame only after the file of its layer — before it, a layer of its own; the canvas is
 the size of the first file that loaded, and the box of a file the box of its pixels with an alpha
 above 0. An art holds at most 8192 layers.
 
@@ -1037,8 +1040,8 @@ once on the console:
 | pictures of files too large for one atlas of the largest size allowed | every layer hidden, one problem of the source naming the size |
 
 What the art cannot load or read out of a file is no error; what code hands in wrong is. After
-`dispose()` — which leaves the parent, disposes the mesh and the atlas of layer files and lets go
-of a store lease — `set()`,
+`dispose()` — which leaves the parent, disposes the mesh and the atlas of layer files and ends the
+following of a store item, which lets go of it — `set()`,
 `apply()`, `reset()` and `update()` write nothing — `set()` and `apply()` still refuse what they
 cannot use —, `layer()` throws, `layerOf()` answers `undefined`, and a load still on its way is
 dropped when it lands: the requests of layer files are aborted, and every decoded picture is closed.
