@@ -1755,6 +1755,47 @@ describe('CameraBasedVisibility', () => {
       expect(CameraBasedVisibility.Plane.normal.toArray()).toEqual([0, 1, 0]);
       expect(new CameraBasedVisibility().planeWorld.normal.toArray()).toEqual([0, 1, 0]);
     });
+
+    // planeWorld is placed by hand, off the calls of Plane#applyMatrix4() (see #placePlaneWorld()):
+    // it has to answer what three answers, turned, scaled unevenly, mirrored and moved
+    test.each<[string, Matrix4]>([
+      ['the identity', new Matrix4()],
+      [
+        'a turn and a move',
+        new Matrix4().compose(
+          new Vector3(7, -3, 12),
+          new Quaternion().setFromEuler(new Euler(0.4, -1.1, 0.7)),
+          new Vector3(1, 1, 1),
+        ),
+      ],
+      [
+        'an uneven scale',
+        new Matrix4().compose(
+          new Vector3(-5, 2, 1),
+          new Quaternion().setFromEuler(new Euler(-0.3, 0.2, 1.3)),
+          new Vector3(2, 0.5, 3),
+        ),
+      ],
+      [
+        'a mirror',
+        new Matrix4().compose(
+          new Vector3(1, 1, 1),
+          new Quaternion().setFromEuler(new Euler(0.9, 0, -0.2)),
+          new Vector3(-1, 2, 1),
+        ),
+      ],
+    ])('planeWorld under %s and an offset grid is the one Plane#applyMatrix4() answers', (_, matrixWorld) => {
+      const visibility = new CameraBasedVisibility(makeTopDownCamera());
+      const tileCoords = new Map2DTileCoordsUtil(100, 100, 30, -45);
+      visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld);
+
+      const expected = CameraBasedVisibility.Plane.applyMatrix4(new Matrix4().makeTranslation(30, 0, -45)).applyMatrix4(
+        matrixWorld,
+      );
+      for (let i = 0; i < 3; i++)
+        expect(visibility.planeWorld.normal.getComponent(i)).toBeCloseTo(expected.normal.getComponent(i), 12);
+      expect(visibility.planeWorld.constant).toBeCloseTo(expected.constant, 10);
+    });
   });
 
   describe('IMap2DVisibilitor interface', () => {

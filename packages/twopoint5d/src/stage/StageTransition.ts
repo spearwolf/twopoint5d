@@ -69,6 +69,12 @@ export const StageTransitionInternals: {
    * reaches 0 or 1 early, this does not.
    */
   isUnderWay(transition: StageTransition): boolean;
+  /**
+   * Writes the progress of `transition` into `into[index]`: the hot path of a director reads it
+   * through a typed array, since a fraction that {@link StageTransition#progress} answers to a caller
+   * V8 has not inlined it into is boxed — 16 bytes per read.
+   */
+  copyProgress(transition: StageTransition, into: Float64Array, index: number): void;
 } = {
   create: unfilledInternal('StageTransitionInternals.create()'),
   advance: unfilledInternal('StageTransitionInternals.advance()'),
@@ -76,6 +82,7 @@ export const StageTransitionInternals: {
   keptOf: unfilledInternal('StageTransitionInternals.keptOf()'),
   isFrozen: unfilledInternal('StageTransitionInternals.isFrozen()'),
   isUnderWay: unfilledInternal('StageTransitionInternals.isUnderWay()'),
+  copyProgress: unfilledInternal('StageTransitionInternals.copyProgress()'),
 };
 
 /**
@@ -133,6 +140,9 @@ export class StageTransition {
       transition.manual || !(transition.duration > 0)
         ? transition.#progress > 0 && transition.#progress < 1
         : transition.#elapsed > 0 && transition.#elapsed < transition.duration;
+    StageTransitionInternals.copyProgress = (transition, into, index) => {
+      into[index] = transition.#progress;
+    };
   }
 
   /** Made by a `StageDirector` alone: every change of its stack answers one. */

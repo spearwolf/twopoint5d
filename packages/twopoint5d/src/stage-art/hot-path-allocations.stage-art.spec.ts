@@ -59,15 +59,18 @@ describe('stage art on the hot path', () => {
   test('a ramp allocates nothing per call', async () => {
     // a double kept in a variable of the closure is a heap number of its own: keep the sum in a typed array
     const sum = new Float64Array(1);
-    const bytesPerRound = await measureSettledBytes(() => {
-      for (let i = 0; i < CALLS; i++) {
-        sum[0]! += rampAt(i % 5, 1, 2);
-        sum[0]! += rampAt(i % 5, 1, 2, 'ease-in-out');
-      }
+    // one call site per round: with both in one loop V8 may inline only one of them — the budget of a
+    // caller, not a property of rampAt() —, and the fraction the other answers is boxed, 16 bytes
+    const linear = await measureSettledBytes(() => {
+      for (let i = 0; i < CALLS; i++) sum[0]! += rampAt(i % 5, 1, 2);
+    });
+    const eased = await measureSettledBytes(() => {
+      for (let i = 0; i < CALLS; i++) sum[0]! += rampAt(i % 5, 1, 2, 'ease-in-out');
     });
 
     expect(sum[0]).toBeGreaterThan(0);
-    expect(bytesPerRound / (CALLS * 2)).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    expect(linear / CALLS, 'linear').toBeLessThan(BYTES_PER_CALL_LIMIT);
+    expect(eased / CALLS, 'ease-in-out').toBeLessThan(BYTES_PER_CALL_LIMIT);
   });
 
   test('laying a layer out allocates nothing per call', async () => {

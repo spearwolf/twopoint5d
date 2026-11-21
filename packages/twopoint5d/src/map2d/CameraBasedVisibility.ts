@@ -372,9 +372,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   // the translation of `#tileBoxMatrix`, which is all it does, for the box that stays in the
   // local space of the map node
   readonly #tileBoxOffset = new Vector3();
-  // the offset of the grid, handed to `makeTranslation()` as a vector — see the note on doubles at
-  // the top of the module
-  readonly #planeOffset = new Vector3();
   // the offset of the grid of the running recomputation, as an object — see the note on doubles at
   // the top of the module
   readonly #gridOffset = new Vector2();
@@ -741,12 +738,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     this.#cameraWorldPosition.setFromMatrixPosition(camera.matrixWorld);
 
-    const gridOffset = this.#gridOffset;
-    const planeOffset = this.#planeOffset;
-    planeOffset.x = gridOffset.x;
-    planeOffset.y = 0;
-    planeOffset.z = gridOffset.y;
-    this.planeWorld.copy(MAP_PLANE).applyMatrix4(_m.makeTranslation(planeOffset)).applyMatrix4(this.matrixWorld);
+    this.#placePlaneWorld();
 
     // the depth the projection of the camera maps its near and far plane to — see the table in the
     // docs of this class
@@ -784,6 +776,47 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
 
     return this.#pointsOnPlane.length;
+  }
+
+  /**
+   * Places {@link planeWorld}: the map plane moved by the offset of the grid, then by `matrixWorld` —
+   * what `planeWorld.copy(MAP_PLANE).applyMatrix4(translation).applyMatrix4(matrixWorld)` answers,
+   * written out. `Plane#applyMatrix4()` hands doubles through calls (`multiplyScalar()`, `dot()`),
+   * and a recomputation under a tilted camera allocated 32 B wherever the compiler left them in
+   * place — see the note on doubles at the top of the module. The translation leaves the normal
+   * alone: it is the second row of the inverse of the upper 3×3 of `matrixWorld`, normalized — the
+   * cross product of its third and first column over its determinant. The point of the plane is the
+   * offset of the grid, taken through `matrixWorld`.
+   */
+  #placePlaneWorld(): void {
+    const e = this.matrixWorld.elements;
+    const gx = this.#gridOffset.x;
+    const gz = this.#gridOffset.y;
+
+    const det =
+      e[0]! * (e[5]! * e[10]! - e[6]! * e[9]!) -
+      e[4]! * (e[1]! * e[10]! - e[2]! * e[9]!) +
+      e[8]! * (e[1]! * e[6]! - e[2]! * e[5]!);
+    let nx = e[9]! * e[2]! - e[10]! * e[1]!;
+    let ny = e[10]! * e[0]! - e[8]! * e[2]!;
+    let nz = e[8]! * e[1]! - e[9]! * e[0]!;
+    // a singular matrix has no inverse: three answers a normal of zeros, and so does this
+    const length = det === 0 ? 0 : Math.sqrt(nx * nx + ny * ny + nz * nz) * Math.sign(det);
+    const scale = length === 0 ? 0 : 1 / length;
+    nx *= scale;
+    ny *= scale;
+    nz *= scale;
+
+    const w = 1 / (e[3]! * gx + e[11]! * gz + e[15]!);
+    const px = (e[0]! * gx + e[8]! * gz + e[12]!) * w;
+    const py = (e[1]! * gx + e[9]! * gz + e[13]!) * w;
+    const pz = (e[2]! * gx + e[10]! * gz + e[14]!) * w;
+
+    const plane = this.planeWorld;
+    plane.normal.x = nx;
+    plane.normal.y = ny;
+    plane.normal.z = nz;
+    plane.constant = -(px * nx + py * ny + pz * nz);
   }
 
   /**

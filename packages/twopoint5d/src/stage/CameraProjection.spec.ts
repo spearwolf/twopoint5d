@@ -16,7 +16,15 @@ import {
 import {describe, expect, it, vi} from 'vitest';
 
 import {OnStageAfterCameraChanged, OnStageCameraPlaced} from '../events.js';
-import {CameraProjection, type CameraProjectionSpecs, fitLens} from './CameraProjection.js';
+import {
+  CameraProjection,
+  type CameraProjectionSpecs,
+  FIT_AUTHORED_ASPECT,
+  FIT_CONTAINER_ASPECT,
+  FIT_LENS,
+  FIT_SOURCE_LENS,
+  fitLens,
+} from './CameraProjection.js';
 import {CameraRig} from './CameraRig.js';
 import {Stage2D} from './Stage2D.js';
 
@@ -357,9 +365,12 @@ describe('CameraProjection', () => {
       ['cover', 2, 1, 1],
       ['cover', 2, 4, 0.5],
     ])('%s of an authored aspect %d in a container of %d scales the lens by %d', (fit, authored, container, factor) => {
-      const target = {lens: 0};
-      fitLens(0.75, authored, container, fit, target);
-      expect(target.lens).toBe(0.75 * factor);
+      const slot = new Float64Array(4);
+      slot[FIT_SOURCE_LENS] = 0.75;
+      slot[FIT_AUTHORED_ASPECT] = authored;
+      slot[FIT_CONTAINER_ASPECT] = container;
+      fitLens(slot, fit);
+      expect(slot[FIT_LENS]).toBe(0.75 * factor);
     });
   });
 

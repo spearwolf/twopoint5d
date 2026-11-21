@@ -35,8 +35,20 @@ export default defineConfig({
       },
       {
         extends: true,
-        // no benchmarks: they belong to `specs`, and the default pattern would run each of them twice
-        test: {name: 'allocations', include: [allocationSpecs], testTimeout: 30_000, benchmark: {include: []}},
+        test: {
+          name: 'allocations',
+          include: [allocationSpecs],
+          testTimeout: 30_000,
+          // V8 compiles optimized code in the main thread, at the call that makes a function hot,
+          // instead of on a background thread that finishes when it gets a core. Whether a double
+          // on a hot path is boxed hangs on which calls are inlined, and that hangs on the moment a
+          // function is optimized: with background jobs a different spec failed in each run of a
+          // busy four-core CI runner (16 to 384 bytes per call), never on a quiet machine. In the
+          // main thread the moment is the same on every machine, and so is the verdict
+          execArgv: ['--expose-gc', '--no-concurrent-recompilation', '--no-concurrent-osr'],
+          // no benchmarks: they belong to `specs`, and the default pattern would run each of them twice
+          benchmark: {include: []},
+        },
       },
     ],
     coverage: {

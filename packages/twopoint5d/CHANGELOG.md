@@ -77,6 +77,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `new VOBufferGeometry()`, `new VertexObjectGeometry()`, `new InstancedVOBufferGeometry()` and `new InstancedVertexObjectGeometry()` throw a `RangeError` when they are handed a pool together with a capacity other than its own — `new VertexObjectGeometry(): capacity must be the capacity of the pool handed in, 10, got 1000` —, and for a base pool when a base capacity follows that is not its own; a base pool without a base capacity is taken as it is. The check comes before anything else, and the pool is left alive and unattached (**BREAKING**). See the Migration Guide
 - `InstancedVOBufferGeometry#dispose()` empties the buffer and serial maps of a pool attached under a name, as it does those of the base and the instanced pool: a map read from `extraInstancedBuffers` or `extraInstancedBufferSerials` before `dispose()` is empty afterwards
 - `TextureAtlas` finds a frame name it lets go of by binary search over the ids of its named frames, so `DynamicAtlas#remove()` takes a logarithmic search per frame, not a linear one
+- perf: a frame of a `StageDirector` with a running transition reads its progress through a typed array, where `StageTransition#progress` answered to a caller V8 left it un-inlined into boxed the fraction — 16 bytes per frame
+- perf: `CameraProjection#updateCamera()` fits the lens of its source without handing fractions through a call, which allocated up to 384 bytes per frame of a `CameraRig` on a moving camera wherever V8 left that call un-inlined
+- perf: a recomputation of `CameraBasedVisibility` places `planeWorld` without `Plane#applyMatrix4()`, whose calls allocated 32 bytes per recomputation wherever V8 left them un-inlined; the plane is the one three answers
 
 ### Removed
 

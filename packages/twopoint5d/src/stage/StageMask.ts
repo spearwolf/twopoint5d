@@ -10,7 +10,7 @@ import type {IRenderable} from './IRenderable.js';
 import {Stage2D} from './Stage2D.js';
 import type {StageDirectorLayer} from './StageDirector.js';
 import {StageMaskWorldStage} from './StageMaskWorldStage.js';
-import type {StageTransition} from './StageTransition.js';
+import {type StageTransition, StageTransitionInternals} from './StageTransition.js';
 
 /** What of the picture of a mask stage is the coverage. */
 export type StageMaskCoverageSource = 'alpha' | 'luminance' | 'red' | 'green' | 'blue';
@@ -32,6 +32,9 @@ export interface StageMaskOptions {
    */
   scale?: number;
 }
+
+// the progress of a transition a mask stage follows, read through a typed array (see followProgressNode)
+const progressScratch = new Float64Array(1);
 
 const SOURCES: readonly StageMaskCoverageSource[] = ['alpha', 'luminance', 'red', 'green', 'blue'];
 
@@ -175,12 +178,13 @@ export class StageMask {
       if (mask.progressNode.value !== progress) mask.progressNode.value = progress;
     };
     StageMaskInternals.followProgress = (mask, transition) => {
-      const progress = transition.progress;
-      mask.#progress[0] = progress;
+      StageTransitionInternals.copyProgress(transition, mask.#progress, 0);
+      const progress = mask.#progress[0]!;
       if (mask.progressNode.value !== progress) mask.progressNode.value = progress;
     };
     StageMaskInternals.followProgressNode = (mask, transition) => {
-      const progress = transition.progress;
+      StageTransitionInternals.copyProgress(transition, progressScratch, 0);
+      const progress = progressScratch[0]!;
       if (mask.progressNode.value !== progress) mask.progressNode.value = progress;
     };
     StageMaskInternals.onDispose = (mask, listener) => {

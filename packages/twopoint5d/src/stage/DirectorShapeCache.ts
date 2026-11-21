@@ -26,6 +26,7 @@ import {RootRenderPipeline} from './RootRenderPipeline.js';
 import {maskCoverage, maskSource} from './maskNodes.js';
 import type {StageDirector} from './StageDirector.js';
 import {StageMask, type StageMaskCoverageSource} from './StageMask.js';
+import {StageTransitionInternals} from './StageTransition.js';
 import {type StageTransitionEffect, textureSource} from './transitionEffects.js';
 
 interface ShapeSlot {
@@ -68,6 +69,9 @@ interface CachedShape {
  * one used last stays longest.
  */
 const KEPT_SHAPES = 16;
+
+// the progress of the transition of a slot, read through a typed array (see writeProgress())
+const progressScratch = new Float64Array(1);
 
 const effectIds = new WeakMap<StageTransitionEffect, number>();
 let nextEffectId = 1;
@@ -316,8 +320,13 @@ export class DirectorShapeCache {
     for (let i = 0; i < shape.slots.length; i++) {
       const progress = shape.slots[i]!.progress;
       const run = slots[i]?.run;
-      // written only when it changed: a double stored again is boxed again, 16 bytes per draw
-      if (progress && run && progress.value !== run.transition.progress) progress.value = run.transition.progress;
+      if (!progress || !run) continue;
+      // read through a typed array, since StageTransition#progress answered to a caller that is not
+      // inlined boxes, and written only when it changed: a double stored again is boxed again —
+      // 16 bytes per draw either way
+      StageTransitionInternals.copyProgress(run.transition, progressScratch, 0);
+      const value = progressScratch[0]!;
+      if (progress.value !== value) progress.value = value;
     }
   }
 

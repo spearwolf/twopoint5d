@@ -3,7 +3,8 @@ import {measureAllocatedBytes} from './measureAllocatedBytes.js';
 const settleRounds = 200;
 const attempts = 3;
 
-// long enough for a compile job that waited for a free core to finish
+// long enough for a compile job that waited for a free core to finish, where the compiler runs
+// on background threads — the Vitest project `allocations` compiles in the main thread
 const compilerPause = () => new Promise<void>((resolve) => setTimeout(resolve, 20));
 
 /**
@@ -16,9 +17,11 @@ const compilerPause = () => new Promise<void>((resolve) => setTimeout(resolve, 2
  * What the setup of a test and the tests before it left behind is collected first, and the round
  * warms up afterwards: the optimized code holds the maps of those objects weakly, and a collection
  * that finds them dead only at the start of the measurement throws that code away — the
- * measurement would time the recompilation instead of the steady state of a frame loop. The
- * compiler runs beside the specs, and while every core runs a spec file a compile job waits, so
- * the answer is the lowest of three measurements with a pause before each. What a round allocates
+ * measurement would time the recompilation instead of the steady state of a frame loop. Where the
+ * compiler runs beside the specs, a compile job waits while every core runs a spec file, so the
+ * answer is the lowest of three measurements with a pause before each; the Vitest config of
+ * `packages/twopoint5d` starts the allocation specs with the compiler in the main thread, where
+ * the moment a function is optimized does not hang on the load of the machine. What a round allocates
  * in the steady state shows up in every one of them.
  *
  * On Node 24.21, over 50 runs of the suite in parallel workers — with V8 coverage and beside eight

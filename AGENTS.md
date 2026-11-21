@@ -50,7 +50,11 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   measure nothing
 - `pnpm test:allocations` — the allocation specs (`src/**/hot-path-allocations*.spec.ts`)
   alone, without coverage: the Vitest project `allocations` in
-  `packages/twopoint5d/vite.config.ts`, 30 s per test. A case measures under the V8
+  `packages/twopoint5d/vite.config.ts`, 30 s per test. Its workers compile optimized code
+  in the main thread (`--no-concurrent-recompilation --no-concurrent-osr`): which calls V8
+  inlines hangs on the moment a function is optimized, and with background compile jobs
+  that moment — and with it the verdict — shifted with the load of the machine. So a
+  failure on CI is one on every machine. A case measures under the V8
   feedback of the cases before it in its file, so a failure is reproduced with the whole
   file, never with `-t`. `pnpm test` runs them along with the rest. The Nx hash of the
   Vitest targets includes `node --version`, so the cache replays no measurement taken
@@ -232,7 +236,11 @@ explicit instruction.
   A round hands the calls it measures whole numbers, constants and objects, never a
   fractional value it works out itself: V8 boxes such a value at each call it leaves
   un-inlined, and which calls it inlines shifts with the inlining budget, which block
-  coverage uses up sooner — the round would measure heap numbers of its own. Whether a
+  coverage uses up sooner — the round would measure heap numbers of its own. For the
+  same reason a round calls a function that answers a fraction from one call site only:
+  of two in one loop V8 may inline one, and the answer of the other is boxed in the round
+  (`rampAt()` in `src/stage-art/hot-path-allocations.stage-art.spec.ts` measures its two
+  easings in two rounds). Whether a
   method hands the values of its caller on without boxing them is checked by what it
   calls, as `src/sprites/hot-path-allocations.spec.ts` does for the sprite setters.
   The browser tests share their fixtures through

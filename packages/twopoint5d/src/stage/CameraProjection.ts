@@ -39,32 +39,34 @@ export interface CameraProjectionSpecs {
   far?: number;
 }
 
-/** A lens as {@link fitLens} writes it: `tan(fov / 2)` of a perspective camera, the height of the view of an orthographic one. @internal */
-export interface FittedLens {
-  lens: number;
-}
+/** Where {@link fitLens} reads the lens of the source, the authored aspect and the aspect of the container. @internal */
+export const FIT_SOURCE_LENS = 0;
+/** @internal */
+export const FIT_AUTHORED_ASPECT = 1;
+/** @internal */
+export const FIT_CONTAINER_ASPECT = 2;
+/** Where {@link fitLens} writes the fitted lens. @internal */
+export const FIT_LENS = 3;
 
 /**
- * The lens a frame authored with the lens `sourceLens` at the aspect `authoredAspect` takes in a
- * container of the aspect `containerAspect`, under `fit`, into `target.lens`. A lens is
- * `tan(fov / 2)` of a perspective camera, or the height of the view of an orthographic one: both
- * scale with the visible extent. Under `'contain'` a container narrower than the frame widens the
- * lens until the authored width fits; under `'cover'` a container wider than the frame narrows it
- * until the authored width fills it. Otherwise the lens stays `sourceLens`, exactly.
+ * The lens a frame authored with the lens `slot[FIT_SOURCE_LENS]` at the aspect
+ * `slot[FIT_AUTHORED_ASPECT]` takes in a container of the aspect `slot[FIT_CONTAINER_ASPECT]`, under
+ * `fit`, into `slot[FIT_LENS]`. A lens is `tan(fov / 2)` of a perspective camera, or the height of
+ * the view of an orthographic one: both scale with the visible extent. Under `'contain'` a container
+ * narrower than the frame widens the lens until the authored width fits; under `'cover'` a container
+ * wider than the frame narrows it until the authored width fills it. Otherwise the lens stays the
+ * one of the source, exactly.
  *
- * The answer goes into an object, not out of the call: V8 boxes a fraction a call answers where it
- * does not inline the call. Allocates nothing.
+ * The numbers go in and out through a typed array, not as arguments and not as the answer: V8 boxes
+ * a fraction handed to or answered by a call it does not inline. Allocates nothing.
  * @internal
  */
-export function fitLens(
-  sourceLens: number,
-  authoredAspect: number,
-  containerAspect: number,
-  fit: CameraProjectionFit,
-  target: FittedLens,
-): void {
+export function fitLens(slot: Float64Array, fit: CameraProjectionFit): void {
+  const sourceLens = slot[FIT_SOURCE_LENS]!;
+  const authoredAspect = slot[FIT_AUTHORED_ASPECT]!;
+  const containerAspect = slot[FIT_CONTAINER_ASPECT]!;
   const widen = fit === 'contain' ? authoredAspect > containerAspect : authoredAspect < containerAspect;
-  target.lens = widen ? (sourceLens * authoredAspect) / containerAspect : sourceLens;
+  slot[FIT_LENS] = widen ? (sourceLens * authoredAspect) / containerAspect : sourceLens;
 }
 
 const refuseSource = (source: unknown): never => {
@@ -120,7 +122,7 @@ export class CameraProjection implements IProjection {
   #near = Number.NaN;
   #far = Number.NaN;
 
-  readonly #fitted: FittedLens = {lens: 0.5};
+  readonly #fitted = new Float64Array(4);
 
   // what the last placement read from its source, compared in place by needsPlacement()
   #placedSource?: PerspectiveCamera | OrthographicCamera;
@@ -250,9 +252,13 @@ export class CameraProjection implements IProjection {
       const authoredAspect = this.#aspect > 0 ? this.#aspect : source.aspect;
       const containerAspect = hasView ? this.#width / this.#height : authoredAspect;
       const sourceLens = Math.tan(source.fov * RAD_PER_DEG * 0.5);
-      fitLens(sourceLens, authoredAspect, containerAspect, this.#fit, fitted);
+      fitted[FIT_SOURCE_LENS] = sourceLens;
+      fitted[FIT_AUTHORED_ASPECT] = authoredAspect;
+      fitted[FIT_CONTAINER_ASPECT] = containerAspect;
+      fitLens(fitted, this.#fit);
+      const fittedLens = fitted[FIT_LENS]!;
       // the fov of the source as it is where the fit keeps the lens
-      target.fov = fitted.lens === sourceLens ? source.fov : (2 * Math.atan(fitted.lens)) / RAD_PER_DEG;
+      target.fov = fittedLens === sourceLens ? source.fov : (2 * Math.atan(fittedLens)) / RAD_PER_DEG;
       target.aspect = containerAspect;
       target.zoom = source.zoom;
       this.#writeNearFar(target, source, true);
@@ -267,9 +273,12 @@ export class CameraProjection implements IProjection {
       const height = source.top - source.bottom;
       const authoredAspect = this.#aspect > 0 ? this.#aspect : (source.right - source.left) / height;
       const containerAspect = hasView ? this.#width / this.#height : authoredAspect;
-      fitLens(height, authoredAspect, containerAspect, this.#fit, fitted);
+      fitted[FIT_SOURCE_LENS] = height;
+      fitted[FIT_AUTHORED_ASPECT] = authoredAspect;
+      fitted[FIT_CONTAINER_ASPECT] = containerAspect;
+      fitLens(fitted, this.#fit);
       // around the middle of the frustum of the source, which three does not zoom either
-      const halfHeight = fitted.lens * 0.5;
+      const halfHeight = fitted[FIT_LENS]! * 0.5;
       const halfWidth = halfHeight * containerAspect;
       const middleX = (source.left + source.right) * 0.5;
       const middleY = (source.top + source.bottom) * 0.5;
