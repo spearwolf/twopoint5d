@@ -1,5 +1,7 @@
 # Stage Art Layers, Implementation Plan
 
+> **Built.** All three phases are implemented and the proposal is closed as `implemented`; where the build left this plan is listed there, under "Where the build left the first draft". The checkboxes below stay as written, as in the other plans of this directory.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build `stage-art-layers.md` — `StageArt` with its layers, poses, depth compensation, stack, change detection and picking; `artTrack()`, `rampAt()`, `animationFrameAt()`; `ParallaxProjection#distanceToProjectionPlane`; the guide `docs/stage-art.md`, four lookbook demos — in the three phases of §10, each ending in a green gate.
@@ -8,7 +10,7 @@
 
 **Tech Stack:** TypeScript 7 (NodeNext, `.js` import suffixes), three.js `three/webgpu` (TSL), Vitest, web-test-runner + Playwright (WebGPU and WebGL 2), Astro lookbook, Blender through the `asset-creation` skill.
 
-**Spec:** `packages/twopoint5d/docs/proposals/stage-art-layers.md`; section numbers below (§n) refer to it. GitHub issue #57. Status `specified`.
+**Spec:** `packages/twopoint5d/docs/proposals/stage-art-layers.md`; section numbers below (§n) refer to it. GitHub issue #57. Status `specified` when this plan was written, `implemented` since.
 
 ## Global Constraints
 
